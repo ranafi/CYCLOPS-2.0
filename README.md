@@ -9,7 +9,7 @@ A brief description of how to use CYCLOPS 2.0 to order your own dataset.
 
 ### Packages
 This module uses the following pacakges
-```julia
+
 [336ed68f] CSV --------------- v0.10.4
 [a93c6f00] DataFrames -------- v1.3.4
 [31c24e10] Distributions ----- v0.25.68
@@ -26,5 +26,4 @@ This module uses the following pacakges
 [37e2e46d] LinearAlgebra
 [9a3f8284] Random
 [10745b16] Statistics
-```
 
