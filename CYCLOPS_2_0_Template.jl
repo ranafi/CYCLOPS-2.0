@@ -103,5 +103,5 @@ Distributed.addprocs(length(Sys.cpu_info()))
 # real training run
 training_parameters[:align_genes] = CYCLOPS.human_homologue_gene_symbol[CYCLOPS.human_homologue_gene_symbol .!= "RORC"]
 training_parameters[:align_acrophases] = CYCLOPS.mouse_acrophases[CYCLOPS.human_homologue_gene_symbol .!= "RORC"]
-eigendata, model_outputs, best_model, parameters = CYCLOPS.Fit(expression_data, seed_genes, training_parameters)
-CYCLOPS.Align(expression_data, model_outputs, best_model, parameters, output_path)
+eigendata, modeloutputs, correlations, bestmodel, parameters = CYCLOPS.Fit(expression_data, seed_genes, training_parameters)
+CYCLOPS.Align(expression_data, modeloutputs, correlations, bestmodel, parameters, output_path)
