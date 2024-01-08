@@ -10,18 +10,21 @@ A brief description of how to use CYCLOPS 2.0 to order your own dataset.
 ### Packages
 This module uses the following pacakges
 ```julia
-DataFrames
-Statistics
-StatsBase
-LinearAlgebra
-MultivariateStats
-Flux
-PyPlot
-Distributed
-Random
-CSV
-Revise
-Distributions
-Dates
-MultipleTesting
+[336ed68f] CSV --------------- v0.10.4
+[a93c6f00] DataFrames -------- v1.3.4
+[31c24e10] Distributions ----- v0.25.68
+[587475ba] Flux -------------- v0.13.5
+[f8716d33] MultipleTesting --- v0.5.1
+[6f286f6a] MultivariateStats - v0.10.0
+[91a5bcdd] Plots ------------- v1.38.11
+[d330b81b] PyPlot ------------ v2.11.0
+[295af30f] Revise ------------ v3.4.0
+[2913bbd2] StatsBase --------- v0.33.21
+[fdbf4ff8] XLSX -------------- v0.8.4
+[ade2ca70] Dates
+[8ba89e20] Distributed
+[37e2e46d] LinearAlgebra
+[9a3f8284] Random
+[10745b16] Statistics
 ```
+
