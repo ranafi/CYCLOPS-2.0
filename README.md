@@ -6,3 +6,22 @@ This module contains all the code necessary to pre-process data, train CYCLOPS 2
 
 ## CYCLOPS Template
 A brief description of how to use CYCLOPS 2.0 to order your own dataset.
+
+### Packages
+This module uses the following pacakges
+'''julia
+DataFrames
+Statistics
+StatsBase
+LinearAlgebra
+MultivariateStats
+Flux
+PyPlot
+Distributed
+Random
+CSV
+Revise
+Distributions
+Dates
+MultipleTesting
+'''
