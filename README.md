@@ -46,13 +46,14 @@ The format of the expression data file is as follows:
    Row │ Gene_Symbol   GTEX_1117F_2826_SM_5GZXL  GTEX_1122O_1226_SM_5H113  GTEX ⋯
        │ String15      String15                  String15                  Stri ⋯
 ───────┼─────────────────────────────────────────────────────────────────────────
-     1 │ tissueType_D  NonTumor                  NonTumor                  NonT ⋯
+     1 │ tissueType_D  NonTumor                  Tumor                     NonT ⋯
      2 │ site_D        B1                        B1                        B1
      3 │ WASH7P        10.04                     3.248                     4.82
      4 │ LINC01128     5.357                     7.199                     4.57
      5 │ SAMD11        0.6739                    1.213                     0.46 ⋯
      6 │ NOC2L         64.54                     62.24                     73.7
-   ⋮   │      ⋮                   ⋮                         ⋮                   ⋱
+     7 | NOC2L         65.52                     61.18                     74.8
+   ⋮   |      ⋮                   ⋮                         ⋮                   ⋱
  12865 │ MTCP1         6.513                     6.308                     7.13
  12866 │ BRCC3         9.685                     10.12                     16.1
  12867 │ VBP1          34.65                     30.77                     25.4 ⋯
