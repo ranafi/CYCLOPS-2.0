@@ -9,7 +9,7 @@ A brief description of how to use CYCLOPS 2.0 to order your own dataset.
 
 ### Packages
 This module uses the following pacakges
-'''julia
+```julia
 DataFrames
 Statistics
 StatsBase
@@ -24,4 +24,4 @@ Revise
 Distributions
 Dates
 MultipleTesting
-'''
+```
