@@ -8,22 +8,60 @@ This module contains all the code necessary to pre-process data, train CYCLOPS 2
 A brief description of how to use CYCLOPS 2.0 to order your own dataset.
 
 ### Packages
-This module uses the following pacakges
+This module uses the following pacakges (- version)
 ```
-[336ed68f] CSV --------------- v0.10.4  
-[a93c6f00] DataFrames -------- v1.3.4  
-[31c24e10] Distributions ----- v0.25.68  
-[587475ba] Flux -------------- v0.13.5  
-[f8716d33] MultipleTesting --- v0.5.1  
-[6f286f6a] MultivariateStats - v0.10.0  
-[91a5bcdd] Plots ------------- v1.38.11  
-[d330b81b] PyPlot ------------ v2.11.0  
-[295af30f] Revise ------------ v3.4.0  
-[2913bbd2] StatsBase --------- v0.33.21  
-[fdbf4ff8] XLSX -------------- v0.8.4  
-[ade2ca70] Dates  
-[8ba89e20] Distributed  
-[37e2e46d] LinearAlgebra  
-[9a3f8284] Random  
-[10745b16] Statistics  
+CSV --------------- v0.10.4  
+DataFrames -------- v1.3.4  
+Distributions ----- v0.25.68  
+Flux -------------- v0.13.5  
+MultipleTesting --- v0.5.1  
+MultivariateStats - v0.10.0  
+Plots ------------- v1.38.11  
+PyPlot ------------ v2.11.0  
+Revise ------------ v3.4.0  
+StatsBase --------- v0.33.21  
+XLSX -------------- v0.8.4  
+Dates  
+Distributed  
+LinearAlgebra  
+Random  
+Statistics  
 ```
+
+### Expression Data File
+The format of the expression data file is as follows:  
+  
+1. Each column is a sample.
+2. Each row is a transcript.
+3. The first column of the dataset contains gene symbols and covariate labels (see 'Covariates' and 'Hyper Parameters').
+4. The first 'k' rows contain covariates and all following rows contain numeric expression data (see 'Covariates').
+5. Samples and columns with 'missing' or 'NaN' values should be removed from the dataset.
+6. Column names should start with letters and should only contain numbers, letters, and underscores ('_').
+7. Duplicate gene symbols are allowed.
+8. Duplicate column names are NOT allowed.
+
+#### Example Expression Data File
+```
+12869×653 DataFrame
+   Row │ Gene_Symbol   GTEX_1117F_2826_SM_5GZXL  GTEX_1122O_1226_SM_5H113  GTEX ⋯
+       │ String15      String15                  String15                  Stri ⋯
+───────┼─────────────────────────────────────────────────────────────────────────
+     1 │ tissueType_D  NonTumor                  NonTumor                  NonT ⋯
+     2 │ site_D        B1                        B1                        B1
+     3 │ WASH7P        10.04                     3.248                     4.82
+     4 │ LINC01128     5.357                     7.199                     4.57
+     5 │ SAMD11        0.6739                    1.213                     0.46 ⋯
+     6 │ NOC2L         64.54                     62.24                     73.7
+   ⋮   │      ⋮                   ⋮                         ⋮                   ⋱
+ 12865 │ MTCP1         6.513                     6.308                     7.13
+ 12866 │ BRCC3         9.685                     10.12                     16.1
+ 12867 │ VBP1          34.65                     30.77                     25.4 ⋯
+ 12868 │ CLIC2         21.85                     30.05                     16.8
+ 12869 │ TMLHE         5.04                      4.06                      5.24
+                                               650 columns and 12858 rows omitted
+```
+
+
+
+
+
