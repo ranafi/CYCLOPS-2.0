@@ -3,7 +3,7 @@ CYCLOPS (Cyclic Ordering by Periodic Structure) is designed to reconstruct the t
   
 This repository contains two '.jl' files. 'CYCLOPS.jl' contains all the functions necessary to pre-process data, train CYCLOPS 2.0, and calculate cosinors of best fit for all transcripts using CYCLOPS sample phase predictions. 'CYCLOPS_2_0_Template.jl' calls the necessary functions from 'CYCLOPS.jl' to order an expression file, given a list of seed genes and hyperparameters. The 'CYCLOPS_2_0_Template.jl' script is copied and pasted into a terminal running Julia 1.6.  
   
-*Please familiarize yourself with the required packages, expression file format, input arguments, and hyperparameters.*  
+*Skip to '2. Packages' for details on using code.*  
   
 # Contents  
 1. Methods  
