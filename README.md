@@ -17,10 +17,10 @@ This repository contains two '.jl' files. 'CYCLOPS.jl' contains all the function
 9. CYCLOPS.Align  
 10. Contact  
    
-## 1. Methods  
+# 1. Methods  
 
   
-## 2. Packages
+# 2. Packages
 This module requires the following packages (- version):  
 ```
 CSV --------------- v0.10.4  
@@ -41,7 +41,7 @@ Random
 Statistics  
 ```
   
-## 3. Expression Data File
+# 3. Expression Data File
 The expression data are a required input to the *CYCLOPS.Fit* and *CYCLOPS.Align* functions. The format of the expression data file is as follows:  
   
 1. Each column is a sample.
@@ -54,7 +54,7 @@ The expression data are a required input to the *CYCLOPS.Fit* and *CYCLOPS.Align
 8. Duplicate gene symbols **are** allowed.
 9. Duplicate column names are **NOT** allowed.
   
-### Example Expression Data File
+## Example Expression Data File
 ```
 12869×653 DataFrame
    Row │ Gene_Symbol   GTEX_1117F_2826_SM_5GZXL  GTEX_1122O_1226_SM_5H113  GTEX ⋯
@@ -74,7 +74,7 @@ The expression data are a required input to the *CYCLOPS.Fit* and *CYCLOPS.Align
  12869 │ TMLHE         5.04                      4.06                      5.24
 ```
   
-## 4. Seed Genes  
+# 4. Seed Genes  
 The seed genes are a required input to the *CYCLOPS.Fit* function. Seed genes must be provided as a vector of strings (not symbols). Also consider:  
   
 1. Case matters!  
@@ -84,7 +84,7 @@ The seed genes are a required input to the *CYCLOPS.Fit* function. Seed genes mu
 3. Seed genes start with letters.  
    *Gene symbols in the expression data should start with letters, therefore seed genes should also start with letters.*  
   
-### Example Seed Genes
+## Example Seed Genes
 ```
 71-element Vector{String}:
  "ACOT4"
@@ -105,7 +105,7 @@ The seed genes are a required input to the *CYCLOPS.Fit* function. Seed genes mu
  "ZEB2"
 ```
   
-## 5. Covariates  
+# 5. Covariates  
 The expression data may contain rows of grouping variables (discontinuous covariates) or continuous variables (continuous covariates). The following constraints apply:  
   
 1. All covariate rows must be above expression data.
@@ -118,7 +118,7 @@ The expression data may contain rows of grouping variables (discontinuous covari
 7. Covariate rows have regex identifiers <ins>in the gene symbol column</ins>.  
    *The example below, discontinuous covariates end in '_D' and continuous covariates end in '_C'. See 'Hyperparameters.'*  
   
-### Example Covariates
+## Example Covariates
 Below is a sample dataset with three (3) covariates and two (2) genes. Two (2) covariates are discontinuous ('tissueType_D' and 'site_D'), and one (1) is continuous ('age_C').
 ```
    Row │ Gene_Symbol   GTEX_1117F_2826_SM_5GZXL  GTEX_1122O_1226_SM_5H113  GTEX ⋯
@@ -131,10 +131,10 @@ Below is a sample dataset with three (3) covariates and two (2) genes. Two (2) c
 ```
 Note that the example expression data ('GENE1' & 'GENE2') are below all covariate rows (rows 1-3). No other covariates (ending in '_D' or '_C') should be present below 'GENE1.'  
   
-## 6. Hyperparameters  
+# 6. Hyperparameters  
 Hyperparameters are stored in a single dictionary to reduce the number of individual input arguments to the *CYCLOPS.Fit* and *CYCLOPS.Align* functions. Below is the default hyperparameter dictionary, including default values. It is not recommended to alter default values unless absolutely necessary. Any changes to the values of the hyperparameter dictionary will result in warnings printed to the REPL when running the *CYCLOPS.Fit* function.
   
-### Hyperparameters with Default Values
+## Hyperparameters with Default Values
 ```julia
 Dict(  
   :regex_cont => r".*_C",                # What is the regex match for continuous covariates in the data file?
@@ -203,7 +203,7 @@ Dict(
   :X_Val_omit_size => 0.1)               # What is the fraction of samples left out per fold
 ```
   
-### Hyperparameters without Default Values
+## Hyperparameters without Default Values
 Some parameters do not have default values. These parameters come in pairs, meaning that if one parameter is added to the hyperparameter dictionary, the other parameter must also be added.  
 ```julia
 # Pair 1
@@ -219,7 +219,7 @@ Some parameters do not have default values. These parameters come in pairs, mean
 :align_acrophases   # Array{Number, 1}. Acrophases for each gene. 'align_genes' and 'align_acrophases' must be the same length.  
 ```
   
-## 7. Sample Collection Times  
+# 7. Sample Collection Times  
 Sample collection times may be provided and added to the hyperparameter dictionary. These may be used in two different ways:
 1. Semi-supervised training.  
    *CYCLOPS optimizes the distance between predicted and provided sample collection times **while training** when sample ids and collection times are added via ':train_sample_id' and ':train_sample_phase'.*  
@@ -228,22 +228,22 @@ Sample collection times may be provided and added to the hyperparameter dictiona
   
 ':train_sample_phase' **must** be given in radians ($0 - 2\pi$), **NOT** hours. By default, ':align_phases' and ':align_acrophases' must be given in radians, but should you wish to provide hours, also set ':align_base => "hours"' in the hyperparameter dictionary (see 'Hyperparameters').  
 
-## 8. CYCLOPS.Fit  
+# 8. CYCLOPS.Fit  
 *CYCLOPS.Fit* has three (3) input arguments and five (5) outputs.
   
-### Input Arguments
+## Input Arguments
 1. The expression data (as described in section 3),  
 2. the seed genes (as described in section 4),  
 3. and the hyperparameter dictionary (as described in section 6).  
   
-### Outputs  
+## Outputs  
 1. The eigen data,  
 2. the sample fit,  
 3. the eigen gene correlations,  
 4. the trained model,  
 5. and the updated hyperparameter dictionary.  
   
-### Example Usage of CYCLOPS.Fit  
+## Example Usage of CYCLOPS.Fit  
 *CYCLOPS.Fit* may be used with a hyperparameter dictionary...
 ```julia
 eigendata, samplefit, eigendatacorrelations, trainedmodel, updatedparameters = CYCLOPS.Fit(expressiondata, seedgenes, hyperparameters)
@@ -256,10 +256,10 @@ When no hyperparameter dictionary is supplied as the third argument to *CYCLOPS.
 ```julia
 CYCLOPS.DefaultDict()
 ```
-## 9. CYCLOPS.Align  
+# 9. CYCLOPS.Align  
 *CYCLOPS.Align* has six (6) input arguments and saves files to a directory (no outputs).  
   
-### Inputs
+## Inputs
 1. the expression data (as described in section 3),  
 2. the sample fit (second output of CYCLOPS.Fit),  
 3. the eigen gene correlations (third output of CYCLOPS.Fit),  
@@ -267,7 +267,7 @@ CYCLOPS.DefaultDict()
 5. the updated hyperparameter dictionary (fifth output of CYCLOPS.Fit),  
 6. and the output path where results are saved.  
   
-### Saved Files  
+## Saved Files  
 *CYCLOPS.Align* creates four (4) subdirectories:  
 1. Models  
    *The CYCLOPS model with the lowest reconstruction*
@@ -278,13 +278,13 @@ CYCLOPS.DefaultDict()
 4. Fits  
    *Sample phase predictions, eigen gene correlations, and cosinor regression results*
   
-### Example Usage of CYCLOPS.Align  
+## Example Usage of CYCLOPS.Align  
   
 ```julia
 CYCLOPS.Align(expressiondata, samplefit, eigendatacorrelations, trainedmodel, updatedparameters, outputpath)
 ```
   
-### Why 'Align?'
+## Why 'Align?'
 CYCLOPS returns a relative ordering of all samples. Since a circle has no beginning, endpoint, or inherent direction, the raw predicted sample phases must in some way be aligned to the external world. There are three (3) possible ways to align the raw predicted sample phases:
 1. to 17 core clock genes,
 2. to genes of choice,
@@ -301,5 +301,5 @@ Genes of choice may be provided using ':align_genes' and ':align_acrophases' (se
   
 If sample collection times are known for all (or a subset of) samples, these may be provided using ':align_samples' and ':align_phases' (see 'Hyperparameters'). Raw predicted sample phases are aligned to the provided known sample collection times. *Please provide ':align_phases' in radians if ':align_base => "radians".'* (see 'Hyperparameters')  
   
-## 10. Contact
+# 10. Contact
 Please contact janham@pennmedicine.upenn.edu with questions. Kindly make the email's subject '***GitHub CYCLOPS 2.0***'. Please copy and paste the full error in the body of the email and provide the versions of all required packages. Further, provide the script and all necessary files to recreate the error you are encountering. Good luck and happy ordering.
