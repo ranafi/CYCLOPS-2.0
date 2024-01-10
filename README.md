@@ -3,7 +3,7 @@ CYCLOPS (Cyclic Ordering by Periodic Structure) is designed to reconstruct the t
   
 This repository contains two '.jl' files. 'CYCLOPS.jl' contains all the functions necessary to pre-process data, train CYCLOPS 2.0, and calculate cosinors of best fit for all transcripts using CYCLOPS sample phase predictions. 'CYCLOPS_2_0_Template.jl' calls the necessary functions from 'CYCLOPS.jl' to order an expression file, given a list of seed genes and hyperparameters. The 'CYCLOPS_2_0_Template.jl' script is copied and pasted into a terminal running Julia 1.6.  
   
-*Skip to '2. Packages' for details on using code.*  
+*Skip to '2. Packages' to learn how to use the code.*  
   
 # Contents  
 1. Methods  
@@ -18,7 +18,118 @@ This repository contains two '.jl' files. 'CYCLOPS.jl' contains all the function
 10. Contact  
    
 # 1. Methods  
-
+  
+## Expression Data to Eigen Genes
+  
+Pre-processing methods are performed as described by Anafi et al. 2017$`^{[6 (1)]}`$. Probes are restricted to those in the “seed gene” list (*see 'Seed Genes'*) and the top 10,000 most highly expressed (*see ':seed_mth_Gene' in 'Hyperparameters'*). Of these, the list is further limited to those with a coefficient of variation between 0.14 and 0.9 (*see ':seed_min_CV' and ':seed_max_CV' in 'Hyperparameters'*). For these probes, extreme expression values are capped at the top/bottom 2.5th percentile (*see ':blunt_percent' in 'Hyperparameters'*). The expression $X_{i,j}$ of each included probe $i$ in sample $j$ is scaled to give $S_{i,j}$:  
+  
+$$\quad\quad\quad\quad    S_{i,j}=\frac{X_{i,j}-M_i}{M_i},   \quad\quad\quad\quad...(f1)$$
+  
+where $M_i$ is the mean expression of probe $i$ across samples: 
+  
+```math
+\quad\quad\quad\quad    M_i=\Big(\frac{1}{N}\Big)\sum_jX_{i,j}.    \quad\quad\quad\quad...(f2)
+```
+  
+The $S_{i,j}$ data are expressed in eigengene coordinates $E_{i,j}$ following the methods of Alter et al$`^[(2)]`$. The number of eigengenes $N_E$ (singular values) retained is set to capture 85% of the seed data’s total variance (*see ':eigen_total_var' in 'Hyperparameters'*), and an eigengene must contribute at least 6% of the data's total variance to be included (*see ':eigen_contr_var' in 'Hyperparameters*), as described by Anafi et al. 2017$`^{[6 (1)]}`$.  
+  
+## Covariate Processing
+  
+Discontinuous covariates are encoded into reduced one-hot flags. Reduced one-hot encoding results in an $M$-by-$`N`$ matrix, where $M$ is the total number of groups across all covariates, less the number of covariates. This can be represented mathematically as:  
+  
+$$\quad\quad\quad\quad    M=\sum_{c=1}^C(m_c)-C   \quad\quad\quad\quad...(f3)$$  
+  
+where $C$ is the total number of covariates included, and $m$ is the number of groups in covariate $c$.  
+  
+## Example Covariate Processing
+  
+*Why use reduced one-hot encoding?* To reduce the number of free (trainable) parameters. Consider a hypothetical dataset with $N$ samples from two (2) batches.  
+  
+| Covariate | Sample$`_1`$ | Sample$`_2`$ | Sample$`_3`$ | Sample$`_4`$ | ... | Sample$`_N`$ |
+------------|--------------|--------------|--------------|--------------|-----|--------------|
+| Batch     | B1           | B2           | B2           | B1           | ... | B2           |
+  
+In standard one-hot encoding, a sample from batch one (1) and batch two (2) are represented as  
+  
+```math
+\begin{bmatrix}
+1 \\[0.3em]
+0
+\end{bmatrix}\ \&
+\begin{bmatrix}
+0 \\[0.3em]
+1
+\end{bmatrix},\ respectively.
+```  
+  
+This notation contains redundant information. The first row of the matrix can be ommitted without any loss of information, resulting in reduced one-hot encodings for samples in batch one (1) and two (2):  
+  
+$$[0]\ \\&\ [1],\ respectively.$$  
+  
+This reduces the number of free parameters in a model by the number of eigen genes $`N_E`$ retained for a particular dataset (*see 'Model'*).  
+  
+Now, consider a hypothetical dataset with $N$ samples from four (4) batches, where samples could be from one of two (2) tissue types.  
+  
+| Covariate | Sample$`_1`$ | Sample$`_2`$ | Sample$`_3`$ | Sample$`_4`$ | ... | Sample$`_N`$ |
+------------|--------------|--------------|--------------|--------------|-----|--------------|
+| Batch     | B1           | B2           | B3           | B4           | ... | B3           |
+| Type      | T1           | T2           | T1           | T2           | ... | T2           |  
+  
+Instead of considering these two covariates as a combination of states, which would result in eight possible states...
+  
+```math
+\begin{bmatrix}
+Batch_1\ \&\ Type_1 \\[0.3em]
+Batch_2\ \&\ Type_1 \\[0.3em]
+Batch_3\ \&\ Type_1 \\[0.3em]
+Batch_4\ \&\ Type_1 \\[0.3em]
+Batch_1\ \&\ Type_2 \\[0.3em]
+Batch_2\ \&\ Type_2 \\[0.3em]
+Batch_3\ \&\ Type_2 \\[0.3em]
+Batch_4\ \&\ Type_2
+\end{bmatrix}
+```
+...we consider each covariate independently.
+  
+```math
+\begin{bmatrix}
+Batch_1 \\[0.3em]
+Batch_2 \\[0.3em]
+Batch_3 \\[0.3em]
+Batch_4
+\end{bmatrix}\ can\ be\ reduced\ to\ 
+\begin{bmatrix}
+Batch_2 \\[0.3em]
+Batch_3 \\[0.3em]
+Batch_4
+\end{bmatrix}
+```
+$$and$$
+```math
+\begin{bmatrix}
+Type_1 \\[0.3em]
+Type_2
+\end{bmatrix}\ can\ be\ reduced\ to\ 
+\begin{bmatrix}
+Type_2
+\end{bmatrix}.
+```  
+The final reduced one-hot encoding is 
+```math
+\begin{bmatrix}
+Batch_2 \\[0.3em]
+Batch_3 \\[0.3em]
+Batch_4 \\[0.3em]
+Type_2 \\[0.3em]
+\end{bmatrix}
+```
+This results in a reduction of free parameters of
+```math
+N_E\times \Bigg(\prod_{c=1}^C(m_c)-\bigg(\sum_{c=1}^C(m_c)-C\bigg)\Bigg).
+```
+Thus, we derive $f3$ by way of illustration.  
+  
+CYCLOPS 2.0 was optimized to fit the eigengene expression, including each sample's reduced one-hot covariate encoding.  
   
 # 2. Packages
 This module requires the following packages (- version):  
