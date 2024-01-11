@@ -19,35 +19,35 @@ This repository contains two '.jl' files. 'CYCLOPS.jl' contains all the function
    
 # 1. Methods  
   
-## Expression Data to Eigen Genes
+## Expression Data to eigengenes
   
 Pre-processing methods are performed as described by Anafi et al. 2017$`^{[6 (1)]}`$. Probes are restricted to those in the “seed gene” list (*see 'Seed Genes'*) and the top 10,000 most highly expressed (*see ':seed_mth_Gene' in 'Hyperparameters'*). Of these, the list is further limited to those with a coefficient of variation between 0.14 and 0.9 (*see ':seed_min_CV' and ':seed_max_CV' in 'Hyperparameters'*). For these probes, extreme expression values are capped at the top/bottom 2.5th percentile (*see ':blunt_percent' in 'Hyperparameters'*). The expression $X_{i,j}$ of each included probe $i$ in sample $j$ is scaled to give $S_{i,j}$:  
   
-$$\quad\quad\quad\quad    S_{i,j}=\frac{X_{i,j}-M_i}{M_i},   \quad\quad\quad\quad...(f1)$$
+$$\quad\quad\quad\quad    S_{i,j}=\frac{X_{i,j}-M_i}{M_i},   \quad\quad\quad\quad\dots(f1)$$
   
 where $M_i$ is the mean expression of probe $i$ across samples: 
   
 ```math
-\quad\quad\quad\quad    M_i=\Big(\frac{1}{N}\Big)\sum_jX_{i,j}.    \quad\quad\quad\quad...(f2)
+\quad\quad\quad\quad    M_i=\Big(\frac{1}{N}\Big)\sum_j^kX_{i,j}.    \quad\quad\quad\quad\dots(f2)
 ```
   
 The $S_{i,j}$ data are expressed in eigengene coordinates $E_{i,j}$ following the methods of Alter et al$`^[(2)]`$. The number of eigengenes $N_E$ (singular values) retained is set to capture 85% of the seed data’s total variance (*see ':eigen_total_var' in 'Hyperparameters'*), and an eigengene must contribute at least 6% of the data's total variance to be included (*see ':eigen_contr_var' in 'Hyperparameters*), as described by Anafi et al. 2017$`^{[6 (1)]}`$.  
   
 ## Covariate Processing
   
-Discontinuous covariates are encoded into reduced one-hot flags. Reduced one-hot encoding results in an $M$-by-$`N`$ matrix, where $M$ is the total number of groups across all covariates, less the number of covariates. This can be represented mathematically as:  
+Discontinuous covariates are encoded into reduced one-hot flags. Reduced one-hot encoding results in an $M$-by-$`k`$ matrix, where $M$ is the sum of all covariate groups, less the number of covariates. This can be represented mathematically as:  
   
-$$\quad\quad\quad\quad    M=\sum_{c=1}^C(m_c)-C   \quad\quad\quad\quad...(f3)$$  
+$$\quad\quad\quad\quad    M=\sum_{c=1}^C(m_c)-C   \quad\quad\quad\quad\dots(f3)$$  
   
 where $C$ is the total number of covariates included, and $m$ is the number of groups in covariate $c$.  
   
 ## Example Covariate Processing
   
-*Why use reduced one-hot encoding?* To reduce the number of free (trainable) parameters. Consider a hypothetical dataset with $N$ samples from two (2) batches.  
+*Why use reduced one-hot encoding?* To reduce the number of free (trainable) parameters. Consider a hypothetical dataset ($`EG_1`$) with $k$ samples from two (2) batches ($`M=1`$).  
   
-| Covariate | Sample$`_1`$ | Sample$`_2`$ | Sample$`_3`$ | Sample$`_4`$ | ... | Sample$`_N`$ |
-------------|--------------|--------------|--------------|--------------|-----|--------------|
-| Batch     | B1           | B2           | B2           | B1           | ... | B2           |
+| Covariate | Sample$`_1`$ | Sample$`_2`$ | Sample$`_3`$ | Sample$`_4`$ | $`\dots`$ | Sample$`_k`$ |
+------------|--------------|--------------|--------------|--------------|-----------|--------------|
+| Batch     | B1           | B2           | B2           | B1           | $`\dots`$ | B2           |
   
 In standard one-hot encoding, a sample from batch one (1) and batch two (2) are represented as  
   
@@ -66,14 +66,14 @@ This notation contains redundant information. The first row of the matrix can be
   
 $$[0]\ \\&\ [1],\ respectively.$$  
   
-This reduces the number of free parameters in a model by the number of eigen genes $`N_E`$ retained for a particular dataset (*see 'Model'*).  
+This reduces the number of free parameters in a model by the number of eigengenes $`N_E`$ retained for a particular dataset (*see 'CYCLOPS 2.0 Model'*).  
   
-Now, consider a hypothetical dataset with $N$ samples from four (4) batches, where samples could be from one of two (2) tissue types.  
+Now, consider a hypothetical dataset ($`EG_2`$) with $k$ samples from four (4) batches, where samples could be from one of two (2) tissue types ($`M=4`$).  
   
-| Covariate | Sample$`_1`$ | Sample$`_2`$ | Sample$`_3`$ | Sample$`_4`$ | ... | Sample$`_N`$ |
-------------|--------------|--------------|--------------|--------------|-----|--------------|
-| Batch     | B1           | B2           | B3           | B4           | ... | B3           |
-| Type      | T1           | T2           | T1           | T2           | ... | T2           |  
+| Covariate | Sample$`_1`$ | Sample$`_2`$ | Sample$`_3`$ | Sample$`_4`$ | $`\dots`$ | Sample$`_N`$ |
+------------|--------------|--------------|--------------|--------------|-----------|--------------|
+| Batch     | B1           | B2           | B3           | B4           | $`\dots`$ | B3           |
+| Type      | T1           | T2           | T1           | T2           | $`\dots`$ | T2           |  
   
 Instead of considering these two covariates as a combination of states, which would result in eight possible states...
   
@@ -104,7 +104,7 @@ Batch_3 \\[0.3em]
 Batch_4
 \end{bmatrix}
 ```
-$$and$$
+and
 ```math
 \begin{bmatrix}
 Type_1 \\[0.3em]
@@ -114,22 +114,63 @@ Type_2
 Type_2
 \end{bmatrix}.
 ```  
-The final reduced one-hot encoding is 
+CYCLOPS usese the combined reduced one-hot encodings. 
 ```math
 \begin{bmatrix}
 Batch_2 \\[0.3em]
 Batch_3 \\[0.3em]
 Batch_4 \\[0.3em]
-Type_2 \\[0.3em]
-\end{bmatrix}
-```
-This results in a reduction of free parameters of
-```math
-N_E\times \Bigg(\prod_{c=1}^C(m_c)-\bigg(\sum_{c=1}^C(m_c)-C\bigg)\Bigg).
-```
-Thus, we derive $f3$ by way of illustration.  
+Type_2
+\end{bmatrix}.
+```  
   
 CYCLOPS 2.0 was optimized to fit the eigengene expression, including each sample's reduced one-hot covariate encoding.  
+  
+## CYCLOPS 2.0 Model  
+  
+The CYCLOPS 2.0 Model comprises the core structure and the reduced one-hot encoded layers. The core structure is the original CYCLOPS structure described in Anafi et al. 2017$`^{[6 (1)]}`$.  
+  
+```math
+{\color{Goldenrod}input\ data}\ \to\ {\color{Cyan}reduced\ one\text{-}hot\ encoding}\ \to\ {\color{Red}core\ CYCLOPS\ structure}\ \to\ {\color{Cyan}reduced\ one\text{-}hot\ decoding}
+```  
+  
+### Encoding Layer  
+The reduced one-hot encoded layers consist of an encoding and decoding side. The encoding and decoding reduced one-hot layers share the same parameters, only use linear transformations, and are functional inverses.  
+  
+```math  
+{\color{Cyan}reduced\ one\text{-}hot\ encoded\ data}={\color{Goldenrod}input\ data}∘(1+W∙G)+b∙C+d.
+```  
+    
+### Decoding Layer
+```math  
+{\color{Cyan}reduced\ one\text{-}hot\ decoded\ data}=
+\frac{{\color{Red}core\ CYCLOPS\ output}-(b∙C+d)}{1+W∙G}
+```  
+  
+### Parameters
+- “$`∘`$” is the element-wise matrix product,  
+- and “$`∙`$” is the matrix dot product.  
+- The input data for sample $j$ is a column vector with $N_E$ rows.  
+- $G$ is the covariate encoding of sample $j$, and a column vector with $M$ rows.  
+- $W$ is an $N_E$-by-$`M`$ (rows-by-columns) matrix.  
+- Similarly, $b$ is also an $N_E$-by-$`M`$ matrix.  
+- $d$ is a column vector with $N_E$ rows.
+  
+The resulting covariate encoded and decoded data have the exact dimensions as the input data.
+  
+### Example Covariate Encoding
+Consider $`EG_2`$, then $`M=4`$. Lets assume $`N_E=5`$.  
+  
+```math
+{\color{Goldenrod}input\ data}=
+\begin{bmatrix}
+1 \\[0.3em]
+2 \\[0.3em]
+3 \\[0.3em]
+4 \\[0.3em]
+5
+\end{bmatrix}
+```  
   
 # 2. Packages
 This module requires the following packages (- version):  
@@ -253,37 +294,37 @@ Dict(
 
   :blunt_percent => 0.975,               # What is the percentile cutoff below (lower) and above (upper) which values are capped?
 
-  :seed_min_CV => 0.14,                  # The minimum coefficient of variation a gene of interest may have to be included in eigen gene transformation
-  :seed_max_CV => 0.7,                   # The maximum coefficient of a variation a gene of interest may have to be included in eigen gene transformation
-  :seed_mth_Gene => 10000,               # The minimum mean a gene of interest may have to be included in eigen gene transformation
+  :seed_min_CV => 0.14,                  # The minimum coefficient of variation a gene of interest may have to be included in eigengene transformation
+  :seed_max_CV => 0.7,                   # The maximum coefficient of a variation a gene of interest may have to be included in eigengene transformation
+  :seed_mth_Gene => 10000,               # The minimum mean a gene of interest may have to be included in eigengene transformation
 
   :norm_gene_level => true,              # Does mean normalization occur at the seed gene level
   :norm_disc => false,                   # Does batch mean normalization occur at the seed gene level
   :norm_disc_cov => 1,                   # Which discontinuous covariate is used to mean normalize seed level data
 
-  :eigen_reg => true,                    # Does regression against a covariate occur at the eigen gene level
+  :eigen_reg => true,                    # Does regression against a covariate occur at the eigengene level
   :eigen_reg_disc_cov => 1,              # Which discontinous covariate is used for regression
-  :eigen_reg_exclude => false,           # Are eigen genes with r squared greater than cutoff removed from final eigen data output
-  :eigen_reg_r_squared_cutoff => 0.6,    # This cutoff is used to determine whether an eigen gene is excluded from final eigen data used for training
-  :eigen_reg_remove_correct => false,    # Is the first eigen gene removed (true --> default) or it's contributed variance corrected by batch regression (false)
+  :eigen_reg_exclude => false,           # Are eigengenes with r squared greater than cutoff removed from final eigen data output
+  :eigen_reg_r_squared_cutoff => 0.6,    # This cutoff is used to determine whether an eigengene is excluded from final eigen data used for training
+  :eigen_reg_remove_correct => false,    # Is the first eigengene removed (true --> default) or it's contributed variance corrected by batch regression (false)
 
-  :eigen_first_var => false,             # Is a captured variance cutoff on the first eigen gene used
-  :eigen_first_var_cutoff => 0.85,       # Cutoff used on captured variance of first eigen gene
+  :eigen_first_var => false,             # Is a captured variance cutoff on the first eigengene used
+  :eigen_first_var_cutoff => 0.85,       # Cutoff used on captured variance of first eigengene
 
-  :eigen_total_var => 0.85,              # Minimum amount of variance required to be captured by included dimensions of eigen gene data
-  :eigen_contr_var => 0.06,              # Minimum amount of variance required to be captured by a single dimension of eigen gene data
+  :eigen_total_var => 0.85,              # Minimum amount of variance required to be captured by included dimensions of eigengene data
+  :eigen_contr_var => 0.06,              # Minimum amount of variance required to be captured by a single dimension of eigengene data
   :eigen_var_override => false,          # Is the minimum amount of contributed variance ignored
-  :eigen_max => 30,                      # Maximum number of dimensions allowed to be kept in eigen gene data
+  :eigen_max => 30,                      # Maximum number of dimensions allowed to be kept in eigengene data
 
-  :out_covariates => true,               # Are covariates included in eigen gene data
-  :out_use_disc_cov => true,             # Are discontinuous covariates included in eigen gene data
-  :out_all_disc_cov => true,             # Are all discontinuous covariates included if included in eigen gene data
-  :out_disc_cov => 1,                    # Which discontinuous covariates are included at the bottom of the eigen gene data, if not all discontinuous covariates
+  :out_covariates => true,               # Are covariates included in eigengene data
+  :out_use_disc_cov => true,             # Are discontinuous covariates included in eigengene data
+  :out_all_disc_cov => true,             # Are all discontinuous covariates included if included in eigengene data
+  :out_disc_cov => 1,                    # Which discontinuous covariates are included at the bottom of the eigengene data, if not all discontinuous covariates
   :out_use_cont_cov => false,            # Are continuous covariates included in eigen data
-  :out_all_cont_cov => true,             # Are all continuous covariates included in eigen gene data
+  :out_all_cont_cov => true,             # Are all continuous covariates included in eigengene data
   :out_use_norm_cont_cov => false,       # Are continuous covariates Normalized
   :out_all_norm_cont_cov => true,        # Are all continuous covariates normalized
-  :out_cont_cov => 1,                    # Which continuous covariates are included at the bottom of the eigen gene data, if not all continuous covariates, or which continuous covariates are normalized if not all
+  :out_cont_cov => 1,                    # Which continuous covariates are included at the bottom of the eigengene data, if not all continuous covariates, or which continuous covariates are normalized if not all
   :out_norm_cont_cov => 1,               # Which continuous covariates are normalized if not all continuous covariates are included, and only specific ones are included
 
   :init_scale_change => true,            # Are scales changed
@@ -350,7 +391,7 @@ Sample collection times may be provided and added to the hyperparameter dictiona
 ## Outputs  
 1. The eigen data,  
 2. the sample fit,  
-3. the eigen gene correlations,  
+3. the eigengene correlations,  
 4. the trained model,  
 5. and the updated hyperparameter dictionary.  
   
@@ -373,7 +414,7 @@ CYCLOPS.DefaultDict()
 ## Inputs
 1. the expression data (as described in section 3),  
 2. the sample fit (second output of CYCLOPS.Fit),  
-3. the eigen gene correlations (third output of CYCLOPS.Fit),  
+3. the eigengene correlations (third output of CYCLOPS.Fit),  
 4. the trained model (fourth output of CYCLOPS.Fit),  
 5. the updated hyperparameter dictionary (fifth output of CYCLOPS.Fit),  
 6. and the output path where results are saved.  
@@ -387,7 +428,7 @@ CYCLOPS.DefaultDict()
 3. Plots  
    *Clock face and sample alignment plots*
 4. Fits  
-   *Sample phase predictions, eigen gene correlations, and cosinor regression results*
+   *Sample phase predictions, eigengene correlations, and cosinor regression results*
   
 ## Example Usage of CYCLOPS.Align  
   
