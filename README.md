@@ -19,16 +19,16 @@ The 'CYCLOPS_2_0_Template.jl' script is copied and pasted into a terminal runnin
 4. Phase & Magnitude  
 5. Model Optimization  
 6. Packages  
-7. Expression Data File  
-8. Seed Genes  
-9. Covariates  
-10. Hyperparameters  
+7. Hyperparameters  
+8. Expression Data File  
+9. Seed Genes  
+10. Covariates  
 11. Sample Collection Times    
 12. CYCLOPS.Fit  
 13. CYCLOPS.Align  
 14. Contact  
    
-# 1 Data Pre-Processing  
+# 1. Data Pre-Processing  
 Pre-processing methods are performed as described by Anafi et al. 2017$`^{[6 (1)]}`$.  
   
 ## 1.1 Gene Filtering  
@@ -53,7 +53,7 @@ where $M_i$ is the mean expression of probe $i$ across samples:
 The $S_{i,j}$ data are expressed in eigengene coordinates $E_{i,j}$ following the methods of Alter et al$`^{[(2)]}`$.
 The number of eigengenes $N_E$ (singular values) retained is set to capture 85% of the seed data’s total variance (*see ':eigen_total_var' in 'Hyperparameters'*), and an eigengene must contribute at least 6% of the data's total variance to be included (*see ':eigen_contr_var' in 'Hyperparameters*), as described by Anafi et al. 2017$`^{[6 (1)]}`$.  
   
-# 2 Covariate Processing
+# 2. Covariate Processing
 Discontinuous covariates are encoded into multi-hot flags.
 Multi-hot encoding results in an $M$-by-$`k`$ matrix, where $`k`$ is the number of samples in the dataset, and $M$ is the sum of all covariate groups less the number of covariates $`C`$:  
   
@@ -145,7 +145,7 @@ The eight (8) possible multi-hot encodings for these covariates are
 The maximum number of $`1`$s is equal to the number of covariates $`C`$ in the dataset.
 Note that multi-hot encodings have additive relationships.  
   
-# 3 CYCLOPS Architecture  
+# 3. CYCLOPS Architecture  
 The CYCLOPS 2.0 Model comprises the core structure and the multi-hot encoded layers.
 The core structure is the original CYCLOPS structure described in Anafi et al. 2017$`^{[6 (1)]}`$.  
   
@@ -275,7 +275,7 @@ Finally,
 {\color{#FFDF42} \begin{bmatrix} 1 \\[0.3em] 2 \\[0.3em] 3 \\[0.3em] 4 \\[0.3em] 5 \end{bmatrix}}.
 ```  
   
-# 4 Phase & Magnitude  
+# 4. Phase & Magnitude  
 ## 4.1 CYCLOPS Sample Phase  
 CYCLOPS predicts two sample attributes: 1) the sample phase, and 2) the sample magnitude.
 Given the two dimensional input to the circular node ($`x,\ y`$), CYCLOPS phase is given by  
@@ -299,7 +299,7 @@ Given the two dimensional input to the circular node ($`x,\ y`$), CYCLOPS magnit
 \nu = \sqrt{x^2 + y^2}
 ```  
   
-# 5 Model Optimization
+# 5. Model Optimization
 ## 5.1 Loss Function
 CYCLOPS 2.0, just like its forerunner, is an autoencoder algorithm.
 Its target is to recreate the input—the eigengene expression—in the output.
@@ -320,6 +320,21 @@ In stage two, the ADAM optimizer was applied with an initial learning rate of 0.
 If the reconstruction error was decreased from one iteration to the next, the learning rate was scaled by 1.05.
 This optimization was repeated for 2050 iterations (*see ':train_max_steps' in 'Hyperparameters'*) or until the learning rate was reduced 1000-fold (equivalent to 10 consecutive learning rate decreases from the initial point, *see ':train_$`\mu`$A_scale_lim' in 'Hyperparameters'*), whichever came first.
 This is the Flux.jl implementation of the bold-drive optimization implemented in Anafi et. al 2017$`^{[6 (1)]}`$.  
+  
+```mermaid  
+graph LR;
+  A[Start] --> B(take one <br> optimization step);
+  B --> C{decreased <br> reconstruction <br> error?};
+  C -->|No| D(undo optimization step);
+  D --> E(decrease learning <br> rate by 50%);
+  E --> F{learning rate <br> below limit?};
+  F -->|No| B;
+  F -->|Yes| G(save final model);
+  C -->|Yes| H{reached maximum <br> number of <br> steps?};
+  H -->|No| B;
+  H -->|Yes| G;
+  G --> I[End];
+```  
   
 ## 5.4 Collection Time Optimization  
 Optionally, CYCLOPS 2.0 can include a secondary loss function, which uses sample collection time, if available for a small number of samples (*see ':train_sample_phase' and ':train_sample_id' in 'Hyperparameters'*).
@@ -354,116 +369,13 @@ Random
 Statistics  
 ```
   
-# 7. Expression Data File
-## 7.1 Constraints  
-The expression data are a required input to the *CYCLOPS.Fit* and *CYCLOPS.Align* functions.
-The format of the expression data file must follow these rules:  
-  
-1. Each column is a sample.
-2. Each row is a transcript.
-3. The first column of the dataset contains gene symbols and covariate labels (*see 'Covariates' and 'Hyperparameters'*).
-4. All covariate rows come before expression data (*see 'Covariates'*).
-5. Samples and columns with 'missing' or 'NaN' values should be removed from the dataset.
-6. Column names start with letters and only contain numbers, letters, and underscores ('_').
-7. All Gene symbols should start with letters.
-8. Duplicate gene symbols **are** allowed.
-9. Duplicate column names are **NOT** allowed.
-  
-## 7.2 Example Expression Data File
-```
-12869×653 DataFrame
-   Row │ Gene_Symbol   GTEX_1117F_2826_SM_5GZXL  GTEX_1122O_1226_SM_5H113  GTEX ⋯
-───────┼─────────────────────────────────────────────────────────────────────────
-     1 │ tissueType_D  NonTumor                  Tumor                     NonT ⋯
-     2 │ site_D        B1                        B1                        B1
-     3 │ WASH7P        10.04                     3.248                     4.82
-     4 │ LINC01128     5.357                     7.199                     4.57
-     5 │ SAMD11        0.6739                    1.213                     0.46 ⋯
-     6 │ NOC2L         64.54                     62.24                     73.7
-     7 | NOC2L         65.52                     61.18                     74.8
-   ⋮   |      ⋮                   ⋮                         ⋮                   ⋱
- 12865 │ MTCP1         6.513                     6.308                     7.13
- 12866 │ BRCC3         9.685                     10.12                     16.1
- 12867 │ VBP1          34.65                     30.77                     25.4 ⋯
- 12868 │ CLIC2         21.85                     30.05                     16.8
- 12869 │ TMLHE         5.04                      4.06                      5.24
-```
-  
-# 8. Seed Genes  
-## 8.1 Constraints
-The seed genes are a required input to the *CYCLOPS.Fit* function.
-Seed genes must be provided as a vector of strings (not symbols).
-Also consider:  
-  
-1. Case matters!  
-   *"Acot4" in the seed gene list will not match "ACOT4" in the gene symbols of the expression data.*  
-2. Provide enough seed genes.  
-   *The number of seed genes should be greater than ':eigen_max' (see 'Hyperparameters').*  
-3. Seed genes start with letters.  
-   *Gene symbols in the expression data should start with letters, therefore seed genes should also start with letters.*  
-  
-## 8.2 Example Seed Genes
-```
-71-element Vector{String}:
- "ACOT4"
- "ACSM5"
- "ADORA1"
- "ADRB3"
- "ALAS1"
- "ANGPTL2"
- "ARHGAP20"
- "ARNTL"
- ⋮
- "TP53INP2"
- "TSC22D3"
- "TSPAN4"
- "TUSC5"
- "USP2"
- "WEE1"
- "ZEB2"
-```
-  
-# 9. Covariates  
-## 9.1 Constraints  
-The expression data may contain rows of grouping variables (discontinuous covariates) or continuous variables (continuous covariates).
-The following constraints apply:  
-  
-1. All covariate rows must be above expression data.
-2. Grouping variables (discontinous covariates) must start with letters.  
-3. Continuous variables (continuous covariates) must **only** contain numbers.  
-4. Within a row of grouping variables (discontinuous covariates), each group must contain at least two (2) or more samples.  
-   *Consider sample tissue type as a covariate.
-   If the data has 'Non Tumor' and 'Tumor' samples, there should be at least two (2) 'Non Tumor' and two (2) 'Tumor' samples in the data.
-   Ideally, the number of samples in each group is greater than ':eigen_max' (see 'Hyperparameters').*  
-6. All samples must have have values for **all** covariates (rows).  
-7. Covariate rows must have unique names.  
-8. Covariate rows have regex identifiers <ins>in the gene symbol column</ins>.  
-   *The example below, discontinuous covariates end in '_D' and continuous covariates end in '_C' (see 'Hyperparameters').*  
-  
-## 9.2 Example Covariates
-Below is a sample dataset with three (3) covariates and two (2) genes.
-Two (2) covariates are discontinuous ('tissueType_D' and 'site_D'), and one (1) is continuous ('age_C').  
-  
-```  
-   Row │ Gene_Symbol   GTEX_1117F_2826_SM_5GZXL  GTEX_1122O_1226_SM_5H113  GTEX ⋯
-───────┼─────────────────────────────────────────────────────────────────────────
-     1 │ tissueType_D  NonTumor                  Tumor                     NonT ⋯
-     2 │ site_D        B1                        B1                        B1
-     3 │ age_C         25                        56                        62
-     4 │ GENE1         4.32                      27.63                     18.43
-     5 │ GENE2         17.58                     21.42                     35.67
-```  
-  
-Note that the example expression data ('GENE1' & 'GENE2') are below all covariate rows (rows 1-3).
-No other covariates (ending in '_D' or '_C') should be present below 'GENE1.'  
-  
-# 10. Hyperparameters  
+# 7. Hyperparameters  
 Hyperparameters are stored in a single dictionary to reduce the number of individual input arguments to the *CYCLOPS.Fit* and *CYCLOPS.Align* functions.
 Below is the default hyperparameter dictionary, including default values.
 It is not recommended to alter default values unless absolutely necessary.
 Any changes to the values of the hyperparameter dictionary will result in warnings printed to the REPL when running the *CYCLOPS.Fit* function.
   
-## 10.1 Hyperparameters with Default Values
+## 7.1 Hyperparameters with Default Values
 ```julia
 Dict(  
   :regex_cont => r".*_C",                # What is the regex match for continuous covariates in the data file?
@@ -525,14 +437,10 @@ Dict(
   :align_base => "radians",              # What is the base of the list (:align_acrophases or :align_phases)? "radians" or "hours"
   :align_disc => false,                  # Is a discontinuous covariate used to align (true or false)
   :align_disc_cov => 1,                  # Which discontinuous covariate is used to choose samples to separately align (is an integer)
-  :align_other_covariates => false,      # Are other covariates included
-  :align_batch_only => false,
-
-  :X_Val_k => 10,                        # How many folds used in cross validation.
-  :X_Val_omit_size => 0.1)               # What is the fraction of samples left out per fold
+  :align_other_covariates => false)      # Are other covariates included
 ```
   
-## 10.2 Hyperparameters without Default Values
+## 7.2 Hyperparameters without Default Values
 Some parameters do not have default values.
 These parameters come in pairs, meaning that if one parameter is added to the hyperparameter dictionary, the other parameter must also be added.  
   
@@ -550,6 +458,109 @@ These parameters come in pairs, meaning that if one parameter is added to the hy
 :align_acrophases   # Array{Number, 1}. Acrophases for each gene. 'align_genes' and 'align_acrophases' must be the same length.  
 ```  
   
+# 8. Expression Data File
+## 8.1 Constraints  
+The expression data are a required input to the *CYCLOPS.Fit* and *CYCLOPS.Align* functions.
+The format of the expression data file must follow these rules:  
+  
+1. Each column is a sample.
+2. Each row is a transcript.
+3. The first column of the dataset contains gene symbols and covariate labels (*see 'Covariates' and 'Hyperparameters'*).
+4. All covariate rows come before expression data (*see 'Covariates'*).
+5. Samples and columns with 'missing' or 'NaN' values should be removed from the dataset.
+6. Column names start with letters and only contain numbers, letters, and underscores ('_').
+7. All Gene symbols should start with letters.
+8. Duplicate gene symbols **are** allowed.
+9. Duplicate column names are **NOT** allowed.
+  
+## 8.2 Example Expression Data File
+```
+12869×653 DataFrame
+   Row │ Gene_Symbol   GTEX_1117F_2826_SM_5GZXL  GTEX_1122O_1226_SM_5H113  GTEX ⋯
+───────┼─────────────────────────────────────────────────────────────────────────
+     1 │ tissueType_D  NonTumor                  Tumor                     NonT ⋯
+     2 │ site_D        B1                        B1                        B1
+     3 │ WASH7P        10.04                     3.248                     4.82
+     4 │ LINC01128     5.357                     7.199                     4.57
+     5 │ SAMD11        0.6739                    1.213                     0.46 ⋯
+     6 │ NOC2L         64.54                     62.24                     73.7
+     7 | NOC2L         65.52                     61.18                     74.8
+   ⋮   |      ⋮                   ⋮                         ⋮                   ⋱
+ 12865 │ MTCP1         6.513                     6.308                     7.13
+ 12866 │ BRCC3         9.685                     10.12                     16.1
+ 12867 │ VBP1          34.65                     30.77                     25.4 ⋯
+ 12868 │ CLIC2         21.85                     30.05                     16.8
+ 12869 │ TMLHE         5.04                      4.06                      5.24
+```
+  
+# 9. Seed Genes  
+## 9.1 Constraints
+The seed genes are a required input to the *CYCLOPS.Fit* function.
+Seed genes must be provided as a vector of strings (not symbols).
+Also consider:  
+  
+1. Case matters!  
+   *"Acot4" in the seed gene list will not match "ACOT4" in the gene symbols of the expression data.*  
+2. Provide enough seed genes.  
+   *The number of seed genes should be greater than ':eigen_max' (see 'Hyperparameters').*  
+3. Seed genes start with letters.  
+   *Gene symbols in the expression data should start with letters, therefore seed genes should also start with letters.*  
+  
+## 9.2 Example Seed Genes
+```
+71-element Vector{String}:
+ "ACOT4"
+ "ACSM5"
+ "ADORA1"
+ "ADRB3"
+ "ALAS1"
+ "ANGPTL2"
+ "ARHGAP20"
+ "ARNTL"
+ ⋮
+ "TP53INP2"
+ "TSC22D3"
+ "TSPAN4"
+ "TUSC5"
+ "USP2"
+ "WEE1"
+ "ZEB2"
+```
+  
+# 10. Covariates  
+## 10.1 Constraints  
+The expression data may contain rows of grouping variables (discontinuous covariates) or continuous variables (continuous covariates).
+The following constraints apply:  
+  
+1. All covariate rows must be above expression data.
+2. Grouping variables (discontinous covariates) must start with letters.  
+3. Continuous variables (continuous covariates) must **only** contain numbers.  
+4. Within a row of grouping variables (discontinuous covariates), each group must contain at least two (2) or more samples.  
+   *Consider sample tissue type as a covariate.
+   If the data has 'Non Tumor' and 'Tumor' samples, there should be at least two (2) 'Non Tumor' and two (2) 'Tumor' samples in the data.
+   Ideally, the number of samples in each group is greater than ':eigen_max' (see 'Hyperparameters').*  
+6. All samples must have have values for **all** covariates (rows).  
+7. Covariate rows must have unique names.  
+8. Covariate rows have regex identifiers <ins>in the gene symbol column</ins>.  
+   *The example below, discontinuous covariates end in '_D' and continuous covariates end in '_C' (see 'Hyperparameters').*  
+  
+## 10.2 Example Covariates
+Below is a sample dataset with three (3) covariates and two (2) genes.
+Two (2) covariates are discontinuous ('tissueType_D' and 'site_D'), and one (1) is continuous ('age_C').  
+  
+```  
+   Row │ Gene_Symbol   GTEX_1117F_2826_SM_5GZXL  GTEX_1122O_1226_SM_5H113  GTEX ⋯
+───────┼─────────────────────────────────────────────────────────────────────────
+     1 │ tissueType_D  NonTumor                  Tumor                     NonT ⋯
+     2 │ site_D        B1                        B1                        B1
+     3 │ age_C         25                        56                        62
+     4 │ GENE1         4.32                      27.63                     18.43
+     5 │ GENE2         17.58                     21.42                     35.67
+```  
+  
+Note that the example expression data ('GENE1' & 'GENE2') are below all covariate rows (rows 1-3).
+No other covariates (ending in '_D' or '_C') should be present below 'GENE1.'  
+  
 # 11. Sample Collection Times  
 Sample collection times may be provided and added to the hyperparameter dictionary.
 These may be used in two different ways:
@@ -565,9 +576,9 @@ By default, ':align_phases' and ':align_acrophases' must be given in radians, bu
 *CYCLOPS.Fit* has three (3) input arguments and five (5) outputs.
   
 ## 12.1 Input Arguments
-1. The expression data (as described in section 7),  
-2. the seed genes (as described in section 8),  
-3. and the hyperparameter dictionary (as described in section 10).  
+1. The hyperparameter dictionary (as described in section 7),  
+2. the expression data (as described in section 8),  
+3. and the seed genes (as described in section 9).  
   
 ## 12.2 Outputs  
 1. The eigen data,  
@@ -600,7 +611,7 @@ CYCLOPS.DefaultDict()
 *CYCLOPS.Align* has six (6) input arguments and saves files to a directory (no outputs).  
   
 ## 13.1 Input Arguments  
-1. The expression data (as described in section 7),  
+1. The expression data (as described in section 8),  
 2. the sample fit (second output of CYCLOPS.Fit),  
 3. the eigengene correlations (third output of CYCLOPS.Fit),  
 4. the trained model (fourth output of CYCLOPS.Fit),  
