@@ -10,69 +10,32 @@ This repository contains two '.jl' files.
 'CYCLOPS_2_0_Template.jl' calls the necessary functions from 'CYCLOPS.jl' to order an expression file, given a list of seed genes and hyperparameters.
 The 'CYCLOPS_2_0_Template.jl' script is copied and pasted into a terminal running Julia 1.6.  
   
-***To start using code, skip to '2. Packages.'***  
+***To start using code, skip to '6. Packages.'***  
   
 # Contents  
-1. Methods  
-1.1 Expression Data to Eigengenes  
-&nbsp; &nbsp; &nbsp; 1.1.1 Gene Filtering  
-&nbsp; &nbsp; &nbsp; 1.1.2 Seed Gene Expression  
-&nbsp; &nbsp; &nbsp; 1.1.3 Eigengene Expression  
-1.2 Covariate Processing  
-&nbsp; &nbsp; &nbsp; 1.2.1 Example Covariate Processing 1  
-&nbsp; &nbsp; &nbsp; 1.2.2 Example Covariate Processing 2  
-1.3 CYCLOPS 2.0 Model  
-&nbsp; &nbsp; &nbsp; 1.3.1 Multi-hot Encoding Layer  
-&nbsp; &nbsp; &nbsp; 1.3.2 Multi-hot Decoding Layer  
-&nbsp; &nbsp; &nbsp; 1.3.3 Notation  
-&nbsp; &nbsp; &nbsp; 1.3.4 Example Covariate Encoding  
-&nbsp; &nbsp; &nbsp; 1.3.5 Example Covariate Decoding  
-1.4 Core CYCLOPS Structure  
-&nbsp; &nbsp; &nbsp; 1.4.2 Dense Layers  
-&nbsp; &nbsp; &nbsp; 1.4.2 Circular Node  
-1.5 CYCLOPS Sample Attributes  
-&nbsp; &nbsp; &nbsp; 1.5.1 CYCLOPS Sample Phase  
-&nbsp; &nbsp; &nbsp; 1.5.2 CYCLOPS Sample Magnitude  
-1.6 CYCLOPS Ordering  
-&nbsp; &nbsp; &nbsp; 1.6.1 Loss Function  
-&nbsp; &nbsp; &nbsp; 1.6.2 Fixed Learning Rate Optimization  
-&nbsp; &nbsp; &nbsp; 1.6.3 Bold Driver Optimization  
-&nbsp; &nbsp; &nbsp; 1.6.4 Collection Time Optimization  
-2. Packages  
-3. Expression Data File  
-3.1 Constraints  
-3.2 Example Expression Data File  
-4. Seed Genes  
-4.1 Constraints  
-4.2 Example Seed Genes  
-5. Covariates  
-5.1 Constraints  
-5.2 Example Covariates  
-6. Hyperparameters  
-6.1 Hyperparameters with Default Values  
-6.2 Hyperparameters without Default Values  
-7. Sample Collection Times  
-8. CYCLOPS.Fit  
-8.1 Input Arguments  
-8.2 Outputs  
-8.3 Example Usage of CYCLOPS.Fit  
-9. CYCLOPS.Align  
-9.1 Input Arguments  
-9.2 Saved Files  
-9.3 Example Usage of CYCLOPS.Align  
-9.4 Why 'Align?'  
-10. Contact  
+1. Data Pre-Processing  
+2. Covariate Processing  
+3. CYCLOPS Architecture  
+4. Phase & Magnitude  
+5. Model Optimization  
+6. Packages  
+7. Expression Data File  
+8. Seed Genes  
+9. Covariates  
+10. Hyperparameters  
+11. Sample Collection Times    
+12. CYCLOPS.Fit  
+13. CYCLOPS.Align  
+14. Contact  
    
-# 1. Methods  
-  
-## 1.1 Expression Data to Eigengenes
+# 1 Data Pre-Processing  
 Pre-processing methods are performed as described by Anafi et al. 2017$`^{[6 (1)]}`$.  
   
-### 1.1.1 Gene Filtering  
+## 1.1 Gene Filtering  
 Probes are restricted to those in the “seed gene” list (*see 'Seed Genes'*) and the top 10,000 most highly expressed (*see ':seed_mth_Gene' in 'Hyperparameters'*).
 Of these, the list is further limited to those with a coefficient of variation between 0.14 and 0.9 (*see ':seed_min_CV' and ':seed_max_CV' in 'Hyperparameters'*).  
   
-### 1.1.2 Seed Gene Expression  
+## 1.2 Seed Gene Expression  
 For these probes, extreme expression values are capped at the top/bottom 2.5th percentile (*see ':blunt_percent' in 'Hyperparameters'*).
 The expression $X_{i,j}$ of each included probe $i$ in sample $j$ is scaled to give $S_{i,j}$:  
   
@@ -86,22 +49,22 @@ where $M_i$ is the mean expression of probe $i$ across samples:
 \quad\quad\quad\quad    M_i=\Big(\frac{1}{N}\Big)\sum_j^kX_{i,j}.    \quad\quad\quad\quad\dots(f2)
 ```
   
-### 1.1.3 Eigengene Expression  
+## 1.3 Eigengene Expression  
 The $S_{i,j}$ data are expressed in eigengene coordinates $E_{i,j}$ following the methods of Alter et al$`^{[(2)]}`$.
 The number of eigengenes $N_E$ (singular values) retained is set to capture 85% of the seed data’s total variance (*see ':eigen_total_var' in 'Hyperparameters'*), and an eigengene must contribute at least 6% of the data's total variance to be included (*see ':eigen_contr_var' in 'Hyperparameters*), as described by Anafi et al. 2017$`^{[6 (1)]}`$.  
   
-## 1.2 Covariate Processing
-Discontinuous covariates are encoded into reduced one-hot (multi-hot) flags.
-Reduced one-hot (multi-hot) encoding results in an $M$-by-$`k`$ matrix, where $`k`$ is the number of samples in the dataset, and $M$ is the sum of all covariate groups less the number of covariates $`C`$:  
+# 2 Covariate Processing
+Discontinuous covariates are encoded into multi-hot flags.
+Multi-hot encoding results in an $M$-by-$`k`$ matrix, where $`k`$ is the number of samples in the dataset, and $M$ is the sum of all covariate groups less the number of covariates $`C`$:  
   
 ```math  
 \quad\quad\quad\quad    M=\sum_{c=1}^C(m_c)-C.   \quad\quad\quad\quad\dots(f3)  
 ```  
   
-$m_c$ is the number of groups in covariate $c$.  
+$`m_c`$ is the number of groups in covariate $`c`$.  
   
-### 1.2.1 Example Covariate Processing 1
-*Why use reduced one-hot (multi-hot) encoding?*
+## 2.1 Example Covariate Processing 1
+*Why use multi-hot encoding?*
 To reduce the number of free (trainable) parameters.
 Consider a hypothetical dataset $`EG_1`$ with $k$ samples from two (2) batches ($`M=1,\ C=1`$).  
   
@@ -127,7 +90,7 @@ The first row of the matrix can be ommitted without any loss of information, res
   
 This reduces the number of free parameters in a model by the number of eigengenes $`N_E`$ retained for a particular dataset (*see 'CYCLOPS 2.0 Model'*).  
   
-### 1.2.2 Example Covariate Processing 2
+## 2.2 Example Covariate Processing 2
 Now, consider a hypothetical dataset $`EG_2`$ with $k$ samples from four (4) batches, where samples could be from one of two (2) tissue types ($`M=4,\ C=2`$).  
   
 | Covariate | Sample$`_1`$ | Sample$`_2`$ | Sample$`_3`$ | Sample$`_4`$ | $`\dots`$ | Sample$`_N`$ |
@@ -182,44 +145,72 @@ The eight (8) possible multi-hot encodings for these covariates are
 The maximum number of $`1`$s is equal to the number of covariates $`C`$ in the dataset.
 Note that multi-hot encodings have additive relationships.  
   
-## 1.3 CYCLOPS 2.0 Model  
-The CYCLOPS 2.0 Model comprises the core structure and the reduced one-hot (multi-hot) encoded layers.
+# 3 CYCLOPS Architecture  
+The CYCLOPS 2.0 Model comprises the core structure and the multi-hot encoded layers.
 The core structure is the original CYCLOPS structure described in Anafi et al. 2017$`^{[6 (1)]}`$.  
   
-```math
-{\color{#FFDF42}input\ data}\ \to\ reduced\ one\text{-}hot\ encoding\ \to\ core\ CYCLOPS\ structure\ \to\ reduced\ one\text{-}hot\ decoding
+## 3.1 Core Architecture  
+The core CYCLOPS structure has three (3) layers, namely the dimensionality reduction layer, the circular node, and the dimensionality expansion layer.  
+  
+```math  
+\begin{matrix}
+input & \to & dimensionality\ reduction & \to  & circular\ node & \to & dimensionality\ expansion \\[0.3em]
+N_E\ dimensions & \to & 2\ dimensions & \to & 2\ dimensions & \to & N_E\ dimensions
+\end{matrix}
 ```  
   
-The covariate encoded and decoded data have the exact dimensions as the input data.  
+### 3.1.1 Dense Layers  
+The dimensionality reduction and expansion layers are fully connected (dense) layers with linear nodes.
+They transform the data from $`N_E`$-dimensional space to $`2`$-dimensional space, and back again.  
   
-### 1.3.1 Multi-hot Encoding Layer  
+### 3.1.2 Circular Node
+The circular node projects the 2-dimensional data to a point on a unit circle.
+Given the two dimensional input to the circular node ($`x,\ y`$)  
+  
+we find the projections onto the unit circle $`\hat{x}`$ and $`\hat{y}`$ in the following manner  
+  
+```math  
+\hat{x}=\frac{x}{\sqrt{x^2+y^2}},\quad\quad and \quad\quad \hat{y}=\frac{y}{\sqrt{x^2+y^2}}.
+```  
+    
+## 3.2 CYCLOPS 2.0 Architecture
+CYCLOPS 2.0 adds a wrapper around the core structure, allowing the model to simultaneously learn batch effects in the data.  
+  
+```math
+{\color{#FFDF42}input}\ \to\ multi\text{-}hot\ encoding\ \to\ core\ CYCLOPS\ structure\ \to\ multi\text{-}hot\ decoding
+```  
+  
+The multi-hot encoded and decoded data have the exact dimensions as the input.  
+  
+### 3.2.1 Multi-hot Encoding Layer  
 The multi-hot encoded layers consist of an encoding and decoding side.  
   
 ```math  
-multi\text{-}hot\ encoded\ data = {\color{#FFDF42}input\ data}∘(1+{\color{#00AEEF}W}∙{\color{#5240C7}G})+{\color{#FF0000}b}∙{\color{#5240C7}G}+{\color{#D21ED2}d}.
+multi\text{-}hot\ encoded\ data = {\color{#FFDF42}input}∘(1+{\color{#00AEEF}W}∙{\color{#5240C7}G})+{\color{#FF0000}b}∙{\color{#5240C7}G}+{\color{#D21ED2}d}.
 ```  
   
-### 1.3.2 Multi-hot Decoding Layer
+### 3.2.2 Multi-hot Decoding Layer
 The encoding and decoding multi-hot layers share the same parameters, only use linear transformations, and are functional inverses.  
   
 ```math  
 multi\text{-}hot\ decoded\ data = \frac{core\ CYCLOPS\ output-({\color{#FF0000}b}∙{\color{#5240C7}G}+{\color{#D21ED2}d})}{1+{\color{#00AEEF}W}∙{\color{#5240C7}G}}
 ```  
   
-### 1.3.3 Notation
+### 3.2.3 Notation
 - “$`∘`$” is the element-wise matrix product,  
 - and “$`∙`$” is the matrix dot product.  
-- The input data for sample $j$ is a column vector with $N_E$ rows.  
-- $G$ is the covariate multi-hot encoding of sample $j$, and a column vector with $M$ rows.  
-- $W$ is an $N_E$-by-$`M`$ (rows-by-columns) matrix.  
-- Similarly, $b$ is also an $N_E$-by-$`M`$ matrix.  
-- $d$ is a column vector with $N_E$ rows.
+- The input data for sample $`j`$ is a column vector with $`N_E`$ rows.  
+- $`G`$ is the covariate multi-hot encoding of sample $`j`$, and a column vector with $M$ rows.  
+- $`W`$ is an $`N_E`$-by-$`M`$ (rows-by-columns) matrix.  
+- Similarly, $`b`$ is also an $`N_E`$-by-$`M`$ matrix.  
+- $`d`$ is a column vector with $`N_E`$ rows.
   
-### 1.3.4 Example Covariate Encoding
+## 3.3 Examples
+### 3.3.1 Example Covariate Encoding
 Consider $`EG_2\ (M=4,\ C=2)`$, and assume $`N_E=5`$. Let us also assume  
   
 ```math
-{\color{#FFDF42}input\ data_j} = \begin{bmatrix} 1 \\[0.3em] 2 \\[0.3em] 3 \\[0.3em] 4 \\[0.3em] 5 \end{bmatrix},\quad
+{\color{#FFDF42}input_j} = \begin{bmatrix} 1 \\[0.3em] 2 \\[0.3em] 3 \\[0.3em] 4 \\[0.3em] 5 \end{bmatrix},\quad
 {\color{#5240C7}G_j} = \begin{bmatrix} 0 \\[0.3em] 1 \\[0.3em] 0 \\[0.3em] 1 \end{bmatrix},\quad
 {\color{#00AEEF}W} = \begin{bmatrix} 0.11 & 0.21 & 0.31 & 0.41 \\[0.3em] 0.12 & 0.22 & 0.32 & 0.42 \\[0.3em] 0.13 & 0.23 & 0.33 & 0.43 \\[0.3em] 0.14 & 0.24 & 0.34 & 0.44 \\[0.3em] 0.15 & 0.25 & 0.35 & 0.45 \end{bmatrix},\quad
 {\color{#FF0000}b} = \begin{bmatrix} 1.1 & 2.1 & 3.1 & 4.1 \\[0.3em] 1.2 & 2.2 & 3.2 & 4.2 \\[0.3em] 1.3 & 2.3 & 3.3 & 4.3 \\[0.3em] 1.4 & 2.4 & 3.4 & 4.4 \\[0.3em] 1.5 & 2.5 & 3.5 & 4.5 \end{bmatrix},\quad
@@ -229,7 +220,7 @@ Consider $`EG_2\ (M=4,\ C=2)`$, and assume $`N_E=5`$. Let us also assume
 Then,
   
 ```math  
-{\color{#FFDF42}input\ data}∘(1+W∙G)+b∙C+d =
+{\color{#FFDF42}input}∘(1+W∙G)+b∙C+d =
 {\color{#FFDF42} \begin{bmatrix} 1 \\[0.3em] 2 \\[0.3em] 3 \\[0.3em] 4 \\[0.3em] 5 \end{bmatrix}} ∘
 \begin{pmatrix} 1 + {\color{#00AEEF}\begin{bmatrix} 0.11 & 0.21 & 0.31 & 0.41 \\[0.3em] 0.12 & 0.22 & 0.32 & 0.42 \\[0.3em] 0.13 & 0.23 & 0.33 & 0.43 \\[0.3em] 0.14 & 0.24 & 0.34 & 0.44 \\[0.3em] 0.15 & 0.25 & 0.35 & 0.45 \end{bmatrix}} ∙
 {\color{#5240C7}\begin{bmatrix} 0 \\[0.3em] 1 \\[0.3em] 0 \\[0.3em] 1 \end{bmatrix}}
@@ -242,13 +233,13 @@ Then,
 Finally,  
   
 ```math  
-{\color{#FFDF42} \begin{bmatrix} 1 \\[0.3em] 2 \\[0.3em] 3 \\[0.3em] 4 \\[0.3em] 5 \end{bmatrix}} ∘
+{\color{#FFDF42}\begin{bmatrix} 1 \\[0.3em] 2 \\[0.3em] 3 \\[0.3em] 4 \\[0.3em] 5 \end{bmatrix}} ∘
 {\color{#00AEEF}\begin{bmatrix} 1.62 \\[0.3em] 1.64 \\[0.3em] 1.66 \\[0.3em] 1.68 \\[0.3em] 1.70 \end{bmatrix}} +
 {\color{#FF0000}\begin{bmatrix} 7.2 \\[0.3em] 7.4 \\[0.3em] 7.6 \\[0.3em] 7.8 \\[0.3em] 8.0 \end{bmatrix}} =
 \begin{bmatrix} 8.82 \\[0.3em] 10.68 \\[0.3em] 12.58 \\[0.3em] 14.52 \\[0.3em] 16.50 \end{bmatrix}.  
 ```  
   
-### 1.3.5 Example Covariate Decoding
+### 3.3.2 Example Covariate Decoding
 Assume  
   
 ```math  
@@ -284,32 +275,8 @@ Finally,
 {\color{#FFDF42} \begin{bmatrix} 1 \\[0.3em] 2 \\[0.3em] 3 \\[0.3em] 4 \\[0.3em] 5 \end{bmatrix}}.
 ```  
   
-## 1.4 Core CYCLOPS Structure
-The core CYCLOPS structure has three (3) layers, namely the dimensionality reduction layer, the circular node, and the dimensionality expansion layer.  
-  
-```math  
-\begin{matrix}
-input & \to & dimensionality\ reduction & \to  & circular\ node & \to & dimensionality\ expansion \\[0.3em]
-N_E\ dimensions & \to & 2\ dimensions & \to & 2\ dimensions & \to & N_E\ dimensions
-\end{matrix}
-```  
-  
-### 1.4.1 Dense Layers  
-The dimensionality reduction and expansion layers are fully connected (dense) layers with linear nodes.
-They transform the data from $`N_E`$-dimensional space to $`2`$-dimensional space, and back again.  
-  
-### 1.4.2 Circular Node
-The circular node projects the 2-dimensional data to a point on a unit circle.
-Given the two dimensional input to the circular node ($`x,\ y`$)  
-  
-we find the projections onto the unit circle $`\hat{x}`$ and $`\hat{y}`$ in the following manner  
-  
-```math  
-\hat{x}=\frac{x}{\sqrt{x^2+y^2}},\quad\quad and \quad\quad \hat{y}=\frac{y}{\sqrt{x^2+y^2}}.
-```  
-  
-## 1.5 CYCLOPS Sample Attributes  
-### 1.5.1 CYCLOPS Sample Phase  
+# 4 Phase & Magnitude  
+## 4.1 CYCLOPS Sample Phase  
 CYCLOPS predicts two sample attributes: 1) the sample phase, and 2) the sample magnitude.
 Given the two dimensional input to the circular node ($`x,\ y`$), CYCLOPS phase is given by  
   
@@ -325,15 +292,15 @@ undefined & \quad if \quad x = 0 \quad and \quad y = 0
 \end{cases}
 ```  
   
-### 1.5.2 CYCLOPS Sample Magnitude  
+## 4.2 CYCLOPS Sample Magnitude  
 Given the two dimensional input to the circular node ($`x,\ y`$), CYCLOPS magnitude is given by  
   
 ```math  
 \nu = \sqrt{x^2 + y^2}
 ```  
   
-## 1.6 CYCLOPS Ordering
-### 1.6.1 Loss Function
+# 5 Model Optimization
+## 5.1 Loss Function
 CYCLOPS 2.0, just like its forerunner, is an autoencoder algorithm.
 Its target is to recreate the input—the eigengene expression—in the output.
 Thus, the loss function is defined as  
@@ -344,17 +311,17 @@ Thus, the loss function is defined as
 
 also known as the <ins>reconstruction error<ins>.  
 
-### 1.6.2 Fixed Learning Rate Optimization
+## 5.2 Fixed Learning Rate Optimization
 The model is trained in two stages.
 In stage one, the ADAM optimizer$`^{[7 (3)]}`$ was applied with a learning rate of 0.001 and a β of (0.9, 0.999) (*see ':train_$`\mu`$A' and ':train_$`\beta`$' in 'Hyperparameters'*) for a fixed number of iterations (*see ':train_min_steps' in 'Hyperparameters'*).  
   
-### 1.6.3 Bold Driver Optimization
+## 5.3 Bold Driver Optimization
 In stage two, the ADAM optimizer was applied with an initial learning rate of 0.001 and a β of (0.9, 0.999), but if the reconstruction error increased from one iteration to the next, the optimization for that iteration was undone, and the learning rate was scaled by 0.5.
 If the reconstruction error was decreased from one iteration to the next, the learning rate was scaled by 1.05.
 This optimization was repeated for 2050 iterations (*see ':train_max_steps' in 'Hyperparameters'*) or until the learning rate was reduced 1000-fold (equivalent to 10 consecutive learning rate decreases from the initial point, *see ':train_$`\mu`$A_scale_lim' in 'Hyperparameters'*), whichever came first.
 This is the Flux.jl implementation of the bold-drive optimization implemented in Anafi et. al 2017$`^{[6 (1)]}`$.  
   
-### 1.6.4 Collection Time Optimization  
+## 5.4 Collection Time Optimization  
 Optionally, CYCLOPS 2.0 can include a secondary loss function, which uses sample collection time, if available for a small number of samples (*see ':train_sample_phase' and ':train_sample_id' in 'Hyperparameters'*).
 This can help anchor the CYCLOPS ordering to an external time.
 When sample collection times are provided, the sum of the cosine distance between the predicted sample phase and the sample collection time is minimized in parallel to the reconstruction error.
@@ -366,7 +333,7 @@ t \times (1-\cos(\theta_j - \tau_j)),
   
 where $`t`$ is the collection time balance (*see ':train_collection_time_balance' in 'Hyperparameters'*), $`\theta_j`$ is the CYCLOPS predicted phase in radians for sample $`j`$, and $`\tau_j`$ is the collection time in radians for sample $`j`$.
 
-# 2. Packages
+# 6. Packages
 This module requires the following packages (- version)  
 ```
 CSV --------------- v0.10.4  
@@ -387,22 +354,22 @@ Random
 Statistics  
 ```
   
-# 3. Expression Data File
-## 3.1 Constraints  
+# 7. Expression Data File
+## 7.1 Constraints  
 The expression data are a required input to the *CYCLOPS.Fit* and *CYCLOPS.Align* functions.
 The format of the expression data file must follow these rules:  
   
 1. Each column is a sample.
 2. Each row is a transcript.
 3. The first column of the dataset contains gene symbols and covariate labels (*see 'Covariates' and 'Hyperparameters'*).
-4. The first 'k' rows contain covariates and all following rows contain numeric expression data (*see 'Covariates'*).
+4. All covariate rows come before expression data (*see 'Covariates'*).
 5. Samples and columns with 'missing' or 'NaN' values should be removed from the dataset.
 6. Column names start with letters and only contain numbers, letters, and underscores ('_').
 7. All Gene symbols should start with letters.
 8. Duplicate gene symbols **are** allowed.
 9. Duplicate column names are **NOT** allowed.
   
-## 3.2 Example Expression Data File
+## 7.2 Example Expression Data File
 ```
 12869×653 DataFrame
    Row │ Gene_Symbol   GTEX_1117F_2826_SM_5GZXL  GTEX_1122O_1226_SM_5H113  GTEX ⋯
@@ -422,8 +389,8 @@ The format of the expression data file must follow these rules:
  12869 │ TMLHE         5.04                      4.06                      5.24
 ```
   
-# 4. Seed Genes  
-## 4.1 Constraints
+# 8. Seed Genes  
+## 8.1 Constraints
 The seed genes are a required input to the *CYCLOPS.Fit* function.
 Seed genes must be provided as a vector of strings (not symbols).
 Also consider:  
@@ -435,7 +402,7 @@ Also consider:
 3. Seed genes start with letters.  
    *Gene symbols in the expression data should start with letters, therefore seed genes should also start with letters.*  
   
-## 4.2 Example Seed Genes
+## 8.2 Example Seed Genes
 ```
 71-element Vector{String}:
  "ACOT4"
@@ -456,8 +423,8 @@ Also consider:
  "ZEB2"
 ```
   
-# 5. Covariates  
-## 5.1 Constraints  
+# 9. Covariates  
+## 9.1 Constraints  
 The expression data may contain rows of grouping variables (discontinuous covariates) or continuous variables (continuous covariates).
 The following constraints apply:  
   
@@ -473,7 +440,7 @@ The following constraints apply:
 8. Covariate rows have regex identifiers <ins>in the gene symbol column</ins>.  
    *The example below, discontinuous covariates end in '_D' and continuous covariates end in '_C' (see 'Hyperparameters').*  
   
-## 5.2 Example Covariates
+## 9.2 Example Covariates
 Below is a sample dataset with three (3) covariates and two (2) genes.
 Two (2) covariates are discontinuous ('tissueType_D' and 'site_D'), and one (1) is continuous ('age_C').  
   
@@ -490,13 +457,13 @@ Two (2) covariates are discontinuous ('tissueType_D' and 'site_D'), and one (1) 
 Note that the example expression data ('GENE1' & 'GENE2') are below all covariate rows (rows 1-3).
 No other covariates (ending in '_D' or '_C') should be present below 'GENE1.'  
   
-# 6. Hyperparameters  
+# 10. Hyperparameters  
 Hyperparameters are stored in a single dictionary to reduce the number of individual input arguments to the *CYCLOPS.Fit* and *CYCLOPS.Align* functions.
 Below is the default hyperparameter dictionary, including default values.
 It is not recommended to alter default values unless absolutely necessary.
 Any changes to the values of the hyperparameter dictionary will result in warnings printed to the REPL when running the *CYCLOPS.Fit* function.
   
-## 6.1 Hyperparameters with Default Values
+## 10.1 Hyperparameters with Default Values
 ```julia
 Dict(  
   :regex_cont => r".*_C",                # What is the regex match for continuous covariates in the data file?
@@ -565,7 +532,7 @@ Dict(
   :X_Val_omit_size => 0.1)               # What is the fraction of samples left out per fold
 ```
   
-## 6.2 Hyperparameters without Default Values
+## 10.2 Hyperparameters without Default Values
 Some parameters do not have default values.
 These parameters come in pairs, meaning that if one parameter is added to the hyperparameter dictionary, the other parameter must also be added.  
   
@@ -583,7 +550,7 @@ These parameters come in pairs, meaning that if one parameter is added to the hy
 :align_acrophases   # Array{Number, 1}. Acrophases for each gene. 'align_genes' and 'align_acrophases' must be the same length.  
 ```  
   
-# 7. Sample Collection Times  
+# 11. Sample Collection Times  
 Sample collection times may be provided and added to the hyperparameter dictionary.
 These may be used in two different ways:
 1. Semi-supervised training.  
@@ -591,33 +558,37 @@ These may be used in two different ways:
 2. Post-training alignment.  
    *CYCLOPS predicted phases are aligned to sample collection times **after training** when added via ':align_samples' and ':algin_phases'.*  
   
-':train_sample_phase' **must** be given in radians ($0 - 2\pi$), **NOT** hours.
+':train_sample_phase' **must** be given in radians ($`0 - 2\pi`$), **NOT** hours.
 By default, ':align_phases' and ':align_acrophases' must be given in radians, but should you wish to provide hours, also set ':align_base => "hours"' in the hyperparameter dictionary (*see 'Hyperparameters'*).  
 
-# 8. CYCLOPS.Fit  
+# 12. CYCLOPS.Fit  
 *CYCLOPS.Fit* has three (3) input arguments and five (5) outputs.
   
-## 8.1 Input Arguments
-1. The expression data (as described in section 3),  
-2. the seed genes (as described in section 4),  
-3. and the hyperparameter dictionary (as described in section 6).  
+## 12.1 Input Arguments
+1. The expression data (as described in section 7),  
+2. the seed genes (as described in section 8),  
+3. and the hyperparameter dictionary (as described in section 10).  
   
-## 8.2 Outputs  
+## 12.2 Outputs  
 1. The eigen data,  
 2. the sample fit,  
 3. the eigengene correlations,  
 4. the trained model,  
 5. and the updated hyperparameter dictionary.  
   
-## 8.3 Example Usage of CYCLOPS.Fit  
+## 12.3 Example Usage of CYCLOPS.Fit  
 *CYCLOPS.Fit* may be used with a hyperparameter dictionary...
+  
 ```julia
 eigendata, samplefit, eigendatacorrelations, trainedmodel, updatedparameters = CYCLOPS.Fit(expressiondata, seedgenes, hyperparameters)
 ```
+  
 or without adding a hyperparameter dictionary. 
+  
 ```julia
 eigendata, samplefit, eigendatacorrelations, trainedmodel, updatedparameters = CYCLOPS.Fit(expressiondata, seedgenes)
 ```
+   
 When no hyperparameter dictionary is supplied as the third argument to *CYCLOPS.Fit*, the default values for all hyperparameters are used.
 Inspect the default hyperparameters using *CYCLOPS.DefaultDict*.  
   
@@ -625,18 +596,18 @@ Inspect the default hyperparameters using *CYCLOPS.DefaultDict*.
 CYCLOPS.DefaultDict()
 ```  
   
-# 9. CYCLOPS.Align  
+# 13. CYCLOPS.Align  
 *CYCLOPS.Align* has six (6) input arguments and saves files to a directory (no outputs).  
   
-## 9.1 Input Arguments  
-1. the expression data (as described in section 3),  
+## 13.1 Input Arguments  
+1. The expression data (as described in section 7),  
 2. the sample fit (second output of CYCLOPS.Fit),  
 3. the eigengene correlations (third output of CYCLOPS.Fit),  
 4. the trained model (fourth output of CYCLOPS.Fit),  
 5. the updated hyperparameter dictionary (fifth output of CYCLOPS.Fit),  
 6. and the output path where results are saved.  
   
-## 9.2 Saved Files  
+## 13.2 Saved Files  
 *CYCLOPS.Align* creates four (4) subdirectories:  
 1. Models  
    *The CYCLOPS model with the lowest reconstruction*
@@ -647,20 +618,20 @@ CYCLOPS.DefaultDict()
 4. Fits  
    *Sample phase predictions, eigengene correlations, and cosinor regression results*
   
-## 9.3 Example Usage of CYCLOPS.Align  
+## 13.3 Example Usage of CYCLOPS.Align  
   
 ```julia
 CYCLOPS.Align(expressiondata, samplefit, eigendatacorrelations, trainedmodel, updatedparameters, outputpath)
 ```
   
-## 9.4 Why 'Align?'
+## 13.4 Why 'Align?'
 CYCLOPS returns a relative ordering of all samples.
 Since a circle has no beginning, endpoint, or inherent direction, the raw predicted sample phases must in some way be aligned to the external world.
 There are three (3) possible ways to align the raw predicted sample phases:  
   
-1. to 17 core clock genes,  
+1. To 17 core clock genes,  
 2. to genes of choice,  
-3. to known sample collection times.  
+3. or to known sample collection times.  
   
 The raw predicted sample phases are always aligned to the 17 core clock genes.  
   
@@ -672,18 +643,18 @@ CYCLOPS.mouse_acrophases
 Using the raw predicted sample phases, cosinors of best fit are calculated for the 17 core clock genes.
 The cosinors of best fit tell us the predicted times at which transcripts are maximally expressed (transcript acrophases).
 The predicted transcript acrophases are aligned to 'CYCLOPS.mouse_acrophases.'
-Notably, predicted transcript acrophases are only compared for transcripts with a significant cosinor fit ($p < 0.05$).  
+Notably, predicted transcript acrophases are only compared for transcripts with a significant cosinor fit ($`p < 0.05`$).  
   
 Genes of choice may be provided using ':align_genes' and ':align_acrophases' (*see 'Hyperparameters'*).
 As above, raw predicted sample phases are used to calculate cosinors of best fit, this time for the genes of choice.
-Predicted acrophases are aligned to ':align_acrophases' for transcripts with a significant fit ($p < 0.05$).
+Predicted acrophases are aligned to ':align_acrophases' for transcripts with a significant fit ($`p < 0.05`$).
 *Please provide ':align_acrophases' in radians if ':align_base => "radians"' (see 'Hyperparameters')*.  
   
 If sample collection times are known for all (or a subset of) samples, these may be provided using ':align_samples' and ':align_phases' (*see 'Hyperparameters'*).
 Raw predicted sample phases are aligned to the provided known sample collection times.
 *Please provide ':align_phases' in radians if ':align_base => "radians"' (see 'Hyperparameters')*.  
   
-# 10. Contact
+# 14. Contact
 Please contact janham@pennmedicine.upenn.edu with questions.
 Kindly make the email's subject '***GitHub CYCLOPS 2.0***'.
 Please copy and paste the full error in the body of the email and provide the versions of all required packages.
