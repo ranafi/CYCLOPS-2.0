@@ -303,7 +303,7 @@ Given the two dimensional input to the circular node ($`x,\ y`$), CYCLOPS magnit
 ## 5.1 Loss Function
 CYCLOPS 2.0, just like its forerunner, is an autoencoder algorithm.
 Its target is to recreate the input—the eigengene expression—in the output.
-Thus, the loss function is defined as  
+The loss function is defined as  
   
 ```math  
 (input-output)^2,
@@ -316,9 +316,9 @@ The model is trained in two stages.
 In stage one, the ADAM optimizer$`^{[7 (3)]}`$ was applied with a learning rate of 0.001 and a β of (0.9, 0.999) (*see ':train_$`\mu`$A' and ':train_$`\beta`$' in 'Hyperparameters'*) for a fixed number of iterations (*see ':train_min_steps' in 'Hyperparameters'*).  
   
 ## 5.3 Bold Driver Optimization
-In stage two, the ADAM optimizer was applied with an initial learning rate of 0.001 and a β of (0.9, 0.999), but if the reconstruction error increased from one iteration to the next, the optimization for that iteration was undone, and the learning rate was scaled by 0.5.
-If the reconstruction error was decreased from one iteration to the next, the learning rate was scaled by 1.05.
-This optimization was repeated for 2050 iterations (*see ':train_max_steps' in 'Hyperparameters'*) or until the learning rate was reduced 1000-fold (equivalent to 10 consecutive learning rate decreases from the initial point, *see ':train_$`\mu`$A_scale_lim' in 'Hyperparameters'*), whichever came first.
+In stage two, the ADAM optimizer is applied with an initial learning rate of 0.001 and a β of (0.9, 0.999), but if the reconstruction error increases from one iteration to the next, the optimization for that iteration is undone, and the learning rate is scaled by 0.5.
+If the reconstruction error is decreased from one iteration to the next, the learning rate was scaled by 1.05.
+This optimization is repeated for 2050 iterations (*see ':train_max_steps' in 'Hyperparameters'*) or until the learning rate is reduced 1000-fold (equivalent to 10 consecutive learning rate decreases from the initial point, *see ':train_$`\mu`$A_scale_lim' in 'Hyperparameters'*), whichever comes first.
 This is the Flux.jl implementation of the bold-drive optimization implemented in Anafi et. al 2017$`^{[6 (1)]}`$.  
   
 ```mermaid  
@@ -346,8 +346,8 @@ The collection time error is defined as
 t \times (1-\cos(\theta_j - \tau_j)),
 ```  
   
-where $`t`$ is the collection time balance (*see ':train_collection_time_balance' in 'Hyperparameters'*), $`\theta_j`$ is the CYCLOPS predicted phase in radians for sample $`j`$, and $`\tau_j`$ is the collection time in radians for sample $`j`$.
-
+where $`t`$ is the collection time balance (*see ':train_collection_time_balance' in 'Hyperparameters'*), $`\theta_j`$ is the CYCLOPS predicted phase in radians for sample $`j`$, and $`\tau_j`$ is the collection time in radians for sample $`j`$.  
+  
 # 6. Packages
 This module requires the following packages (- version)  
 ```
