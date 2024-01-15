@@ -504,7 +504,7 @@ Also consider:
 2. Provide enough seed genes.  
    *The number of seed genes should be greater than ':eigen_max' (see 'Hyperparameters').*  
 3. Seed genes start with letters.  
-   *Gene symbols in the expression data should start with letters, therefore seed genes should also start with letters.*  
+   *Gene symbols in the expression data should start with letters. Therefore, seed genes should also start with letters.*  
   
 ## 9.2 Example Seed Genes
 ```
@@ -533,13 +533,13 @@ The expression data may contain rows of grouping variables (discontinuous covari
 The following constraints apply:  
   
 1. All covariate rows must be above expression data.
-2. Grouping variables (discontinous covariates) must start with letters.  
+2. Grouping variables (discontinuous covariates) must start with letters.  
 3. Continuous variables (continuous covariates) must **only** contain numbers.  
 4. Within a row of grouping variables (discontinuous covariates), each group must contain at least two (2) or more samples.  
    *Consider sample tissue type as a covariate.
    If the data has 'Non Tumor' and 'Tumor' samples, there should be at least two (2) 'Non Tumor' and two (2) 'Tumor' samples in the data.
    Ideally, the number of samples in each group is greater than ':eigen_max' (see 'Hyperparameters').*  
-6. All samples must have have values for **all** covariates (rows).  
+6. All samples must have values for **all** covariates (rows).  
 7. Covariate rows must have unique names.  
 8. Covariate rows have regex identifiers <ins>in the gene symbol column</ins>.  
    *The example below, discontinuous covariates end in '_D' and continuous covariates end in '_C' (see 'Hyperparameters').*  
@@ -558,7 +558,7 @@ Two (2) covariates are discontinuous ('tissueType_D' and 'site_D'), and one (1) 
      5 │ GENE2         17.58                     21.42                     35.67
 ```  
   
-Note that the example expression data ('GENE1' & 'GENE2') are below all covariate rows (rows 1-3).
+Note, that the example expression data ('GENE1' & 'GENE2') are below all covariate rows (rows 1-3).
 No other covariates (ending in '_D' or '_C') should be present below 'GENE1.'  
   
 # 11. Sample Collection Times  
