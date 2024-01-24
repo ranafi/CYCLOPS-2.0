@@ -364,8 +364,8 @@ First, we fit a linear model for the expression of each transcript independently
 \quad\quad\quad\quad    g_{i,j}=l_i(\theta _j - \phi_{i}) + c_i + \epsilon _i   \quad\quad\quad\quad\dots[M1]  
 ```  
   
-where $`\theta _j`$ is the raw CYCLOPS predicted sample phase for sample $`j`$, $`l_i`$ is the linear term for transcript $`i`$ that multiples $`\theta _j`$, $`c_i`$ is the offset term for transcript $`i`$, and $`\epsilon _i`$ is the residual term for transcript $`i`$
-Using a brute force search, we find the shift $`\phi_i`$ that minimizes the sum of square errors for each transcript $`i`$ (*see ':cosine_shift_iterations' in 'Hyperparameters'*).
+where $`\theta _j`$ is the raw CYCLOPS predicted sample phase for sample $`j`$, $`l_i`$ is the linear term for transcript $`i`$ that multiplies $`\theta _j`$, $`c_i`$ is the offset term for transcript $`i`$, and $`\epsilon _i`$ is the residual term for transcript $`i`$.
+Using a brute force search, we find the shift $`\phi_i`$ that minimizes the sum of square errors for transcript $`i`$ (*see ':cosine_shift_iterations' in 'Hyperparameters'*).
   
 # 7. Packages
 This module requires the following packages (- version)  
