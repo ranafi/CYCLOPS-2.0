@@ -10,23 +10,24 @@ This repository contains two '.jl' files.
 'CYCLOPS_2_0_Template.jl' calls the necessary functions from 'CYCLOPS.jl' to order an expression file, given a list of seed genes and hyperparameters.
 The 'CYCLOPS_2_0_Template.jl' script is copied and pasted into a terminal running Julia 1.6.  
   
-***To start using code, skip to '6. Packages.'***  
+***For a quick start guide, skip to the 'Packages' section.***  
   
 # Contents  
 1. Data Pre-Processing  
 2. Covariate Processing  
 3. CYCLOPS Architecture  
 4. Phase & Magnitude  
-5. Model Optimization  
-6. Packages  
-7. Hyperparameters  
-8. Expression Data File  
-9. Seed Genes  
-10. Covariates  
-11. Sample Collection Times    
-12. CYCLOPS.Fit  
-13. CYCLOPS.Align  
-14. Contact  
+5. Model Optimization
+6. Assessing Transcript Rhythmicity
+7. Packages  
+8. Hyperparameters  
+9. Expression Data File  
+10. Seed Genes  
+11. Covariates  
+12. Sample Collection Times    
+13. CYCLOPS.Fit  
+14. CYCLOPS.Align  
+15. Contact  
    
 # 1. Data Pre-Processing  
 Pre-processing methods are performed as described by Anafi et al. 2017$`^{[6 (1)]}`$.  
@@ -348,7 +349,25 @@ t \times (1-\cos(\theta_j - \tau_j)),
   
 where $`t`$ is the collection time balance (*see ':train_collection_time_balance' in 'Hyperparameters'*), $`\theta_j`$ is the CYCLOPS predicted phase in radians for sample $`j`$, and $`\tau_j`$ is the collection time in radians for sample $`j`$.  
   
-# 6. Packages
+# 6. Assessing Transcript Rhythmicity  
+Transcript rhythmicity is assessed using modified cosinor regression as performed by Anafi et al. 2017$`^{[6 (1)]}`$.
+Cosinor regression is a statistical method of fitting a sinusoidal function to data$`^{[8 (4)]}`$.
+The data are assumed to be the result of a periodic process.
+This approach works best when the data are provided for multiple process cycles.
+CYCLOPS assigns sample phases between $`0`$ and $`2pi`$, covering only a single cycle.
+Therefore, we modify the standard cosinor regression approach to reduce our chances of misidentifying a monotonic process as a cyclic process.  
+  
+## 6.1 Nested Linear Regression Models  
+First, we fit a linear model for the expression of each transcript independently  
+  
+```math  
+\quad\quad\quad\quad    g_{i,j}=l_i(\theta _j - \phi_{i}) + c_i + \epsilon _i   \quad\quad\quad\quad\dots[M1]  
+```  
+  
+where $`\theta _j`$ is the raw CYCLOPS predicted sample phase for sample $`j`$, $`l_i`$ is the linear term for transcript $`i`$ that multiples $`\theta _j`$, $`c_i`$ is the offset term for transcript $`i`$, and $`\epsilon _i`$ is the residual term for transcript $`i`$
+Using a brute force search, we find the shift $`\phi_i`$ that minimizes the sum of square errors for each transcript $`i`$ (*see ':cosine_shift_iterations' in 'Hyperparameters'*).
+  
+# 7. Packages
 This module requires the following packages (- version)  
 ```
 CSV --------------- v0.10.4  
@@ -369,13 +388,13 @@ Random
 Statistics  
 ```
   
-# 7. Hyperparameters  
+# 8. Hyperparameters  
 Hyperparameters are stored in a single dictionary to reduce the number of individual input arguments to the *CYCLOPS.Fit* and *CYCLOPS.Align* functions.
 Below is the default hyperparameter dictionary, including default values.
 It is not recommended to alter default values unless absolutely necessary.
 Any changes to the values of the hyperparameter dictionary will result in warnings printed to the REPL when running the *CYCLOPS.Fit* function.
   
-## 7.1 Hyperparameters with Default Values
+## 8.1 Hyperparameters with Default Values
 ```julia
 Dict(  
   :regex_cont => r".*_C",                # What is the regex match for continuous covariates in the data file?
@@ -440,7 +459,7 @@ Dict(
   :align_other_covariates => false)      # Are other covariates included
 ```
   
-## 7.2 Hyperparameters without Default Values
+## 8.2 Hyperparameters without Default Values
 Some parameters do not have default values.
 These parameters come in pairs, meaning that if one parameter is added to the hyperparameter dictionary, the other parameter must also be added.  
   
@@ -458,8 +477,8 @@ These parameters come in pairs, meaning that if one parameter is added to the hy
 :align_acrophases   # Array{Number, 1}. Acrophases for each gene. 'align_genes' and 'align_acrophases' must be the same length.  
 ```  
   
-# 8. Expression Data File
-## 8.1 Constraints  
+# 9. Expression Data File
+## 9.1 Constraints  
 The expression data are a required input to the *CYCLOPS.Fit* and *CYCLOPS.Align* functions.
 The format of the expression data file must follow these rules:  
   
@@ -473,7 +492,7 @@ The format of the expression data file must follow these rules:
 8. Duplicate gene symbols **are** allowed.
 9. Duplicate column names are **NOT** allowed.
   
-## 8.2 Example Expression Data File
+## 9.2 Example Expression Data File
 ```
 12869×653 DataFrame
    Row │ Gene_Symbol   GTEX_1117F_2826_SM_5GZXL  GTEX_1122O_1226_SM_5H113  GTEX ⋯
@@ -493,8 +512,8 @@ The format of the expression data file must follow these rules:
  12869 │ TMLHE         5.04                      4.06                      5.24
 ```
   
-# 9. Seed Genes  
-## 9.1 Constraints
+# 10. Seed Genes  
+## 10.1 Constraints
 The seed genes are a required input to the *CYCLOPS.Fit* function.
 Seed genes must be provided as a vector of strings (not symbols).
 Also consider:  
@@ -506,7 +525,7 @@ Also consider:
 3. Seed genes start with letters.  
    *Gene symbols in the expression data should start with letters. Therefore, seed genes should also start with letters.*  
   
-## 9.2 Example Seed Genes
+## 10.2 Example Seed Genes
 ```
 71-element Vector{String}:
  "ACOT4"
@@ -527,8 +546,8 @@ Also consider:
  "ZEB2"
 ```
   
-# 10. Covariates  
-## 10.1 Constraints  
+# 11. Covariates  
+## 11.1 Constraints  
 The expression data may contain rows of grouping variables (discontinuous covariates) or continuous variables (continuous covariates).
 The following constraints apply:  
   
@@ -544,7 +563,7 @@ The following constraints apply:
 8. Covariate rows have regex identifiers <ins>in the gene symbol column</ins>.  
    *The example below, discontinuous covariates end in '_D' and continuous covariates end in '_C' (see 'Hyperparameters').*  
   
-## 10.2 Example Covariates
+## 11.2 Example Covariates
 Below is a sample dataset with three (3) covariates and two (2) genes.
 Two (2) covariates are discontinuous ('tissueType_D' and 'site_D'), and one (1) is continuous ('age_C').  
   
@@ -561,7 +580,7 @@ Two (2) covariates are discontinuous ('tissueType_D' and 'site_D'), and one (1) 
 Note, that the example expression data ('GENE1' & 'GENE2') are below all covariate rows (rows 1-3).
 No other covariates (ending in '_D' or '_C') should be present below 'GENE1.'  
   
-# 11. Sample Collection Times  
+# 12. Sample Collection Times  
 Sample collection times may be provided and added to the hyperparameter dictionary.
 These may be used in two different ways:
 1. Semi-supervised training.  
@@ -572,22 +591,22 @@ These may be used in two different ways:
 ':train_sample_phase' **must** be given in radians ($`0 - 2\pi`$), **NOT** hours.
 By default, ':align_phases' and ':align_acrophases' must be given in radians, but should you wish to provide hours, also set ':align_base => "hours"' in the hyperparameter dictionary (*see 'Hyperparameters'*).  
 
-# 12. CYCLOPS.Fit  
+# 13. CYCLOPS.Fit  
 *CYCLOPS.Fit* has three (3) input arguments and five (5) outputs.
   
-## 12.1 Input Arguments
-1. The hyperparameter dictionary (as described in section 7),  
-2. the expression data (as described in section 8),  
-3. and the seed genes (as described in section 9).  
+## 13.1 Input Arguments
+1. The hyperparameter dictionary (as described in 'Hyperparameters'),  
+2. the expression data (as described in 'Expression Data File'),  
+3. and the seed genes (as described in 'Seed Genes').  
   
-## 12.2 Outputs  
+## 13.2 Outputs  
 1. The eigen data,  
 2. the sample fit,  
 3. the eigengene correlations,  
 4. the trained model,  
 5. and the updated hyperparameter dictionary.  
   
-## 12.3 Example Usage of CYCLOPS.Fit  
+## 13.3 Example Usage of CYCLOPS.Fit  
 *CYCLOPS.Fit* may be used with a hyperparameter dictionary...
   
 ```julia
@@ -607,18 +626,18 @@ Inspect the default hyperparameters using *CYCLOPS.DefaultDict*.
 CYCLOPS.DefaultDict()
 ```  
   
-# 13. CYCLOPS.Align  
+# 14. CYCLOPS.Align  
 *CYCLOPS.Align* has six (6) input arguments and saves files to a directory (no outputs).  
   
-## 13.1 Input Arguments  
-1. The expression data (as described in section 8),  
+## 14.1 Input Arguments  
+1. The expression data (as described in 'Expression Data File'),  
 2. the sample fit (second output of CYCLOPS.Fit),  
 3. the eigengene correlations (third output of CYCLOPS.Fit),  
 4. the trained model (fourth output of CYCLOPS.Fit),  
 5. the updated hyperparameter dictionary (fifth output of CYCLOPS.Fit),  
 6. and the output path where results are saved.  
   
-## 13.2 Saved Files  
+## 14.2 Saved Files  
 *CYCLOPS.Align* creates four (4) subdirectories:  
 1. Models  
    *The CYCLOPS model with the lowest reconstruction*
@@ -629,13 +648,13 @@ CYCLOPS.DefaultDict()
 4. Fits  
    *Sample phase predictions, eigengene correlations, and cosinor regression results*
   
-## 13.3 Example Usage of CYCLOPS.Align  
+## 14.3 Example Usage of CYCLOPS.Align  
   
 ```julia
 CYCLOPS.Align(expressiondata, samplefit, eigendatacorrelations, trainedmodel, updatedparameters, outputpath)
 ```
   
-## 13.4 Why 'Align?'
+## 14.4 Why 'Align?'
 CYCLOPS returns a relative ordering of all samples.
 Since a circle has no beginning, endpoint, or inherent direction, the raw predicted sample phases must in some way be aligned to the external world.
 There are three (3) possible ways to align the raw predicted sample phases:  
@@ -665,7 +684,7 @@ If sample collection times are known for all (or a subset of) samples, these may
 Raw predicted sample phases are aligned to the provided known sample collection times.
 *Please provide ':align_phases' in radians if ':align_base => "radians"' (see 'Hyperparameters')*.  
   
-# 14. Contact
+# 15. Contact
 Please contact janham@pennmedicine.upenn.edu with questions.
 Kindly make the email's subject '***GitHub CYCLOPS 2.0***'.
 Please copy and paste the full error in the body of the email and provide the versions of all required packages.
