@@ -1152,17 +1152,36 @@ function build_model(the_path::String)
     return CYCLOPS.Covariates(model_S_OH, model_B, model_B_OH, model_L1, model_L2, model_o)
 end
 
-function build_model_2(the_path::String)
+function build_model_old_saves(the_path::String)
 	model_csv = CSV.read(the_path, DataFrame)
 	model_S_OH = eval(Meta.parse(model_csv[2,2]))
-	model_B_OH = eval(Meta.parse(model_csv[3,2]))
-	model_L2 = eval(Meta.parse(model_csv[4,2]))
 	model_B = eval(Meta.parse(model_csv[5,2]))
+	model_B_OH = eval(Meta.parse(model_csv[3,2]))
 	model_L1 = eval(Meta.parse(model_csv[6,2]))
+	model_L2 = eval(Meta.parse(model_csv[4,2]))
 	model_o = parse(Int64, model_csv[1,2])
 	return CYCLOPS.Covariates(model_S_OH, model_B, model_B_OH, model_L1, model_L2, model_o)
 end
 
+function make_dict(parameter_csv::DataFrame)
+    output_dict = Dict{Symbol,Any}()
+    for ii in 1:length(parameter_csv[:, :first])
+		println(ii)
+        jj = parameter_csv[ii, :first]
+        kk = parameter_csv[ii, :second]
+        if ismissing(kk)
+        elseif kk == "radians"
+            output_dict[Symbol(jj)] = kk
+        elseif typeof(Meta.parse(kk)) .!= Expr
+            output_dict[Symbol(jj)] = eval(Meta.parse(kk))
+        elseif (Meta.parse(kk).args[1] == :(Array{String,1})) | (Meta.parse(kk).args[1] == :(Array{Int64,2}))
+            output_dict[Symbol(jj)] = eval.(Meta.parse(kk).args[2:end])
+        else
+            output_dict[Symbol(jj)] = eval(Meta.parse(kk))
+        end
+    end
+    return output_dict
+end
 ##################
 # Loss Functions #
 ##################
@@ -1238,7 +1257,7 @@ function TrainCovariates(m, gea_vectorized; MinSteps::Int = 250, MaxSteps::Int =
 			μA = μA * 1.05
 			before = mean(map(x -> mse(m(x), x[1:m.o]), gea_vectorized))
 			before_m = deepcopy(m)
-			Flux.train!(x->mse(m(x), x[1:m.o]), Flux.params(m.S_OH, m.B, m.B_OH, m.L1, m.L1, m.L2), zip(gea_vectorized), ADAM(μA, β), cb = () -> ())
+			Flux.train!(x->mse(m(x), x[1:m.o]), Flux.params(m.S_OH, m.B, m.B_OH, m.L1, m.L2), zip(gea_vectorized), ADAM(μA, β), cb = () -> ())
 			after = mean(map(x -> mse(m(x), x[1:m.o]), gea_vectorized))
 			change = before - after
 
@@ -1524,6 +1543,55 @@ function MakeFloat(ar::T where T <: Union{DataFrame, Array}, OUT_TYPE::DataType 
 	return Array{OUT_TYPE, 2}(ar)
 end
 
+function GetBluntXthPercentile(dataFile::T, ops; OUT_TYPE = DataFrame) where T <: Union{DataFrame, Array{T2, 2}} where T2 <: Union{Float32, Float64}
+	if ops[:norm_gene_level]
+		if ops[:norm_disc] & !(ismissing(ops[:o_dcl]))
+			n_cov = length(ops[:norm_disc_cov])
+			test_n_cov = (n_cov > 1)
+			!test_n_cov || error("Only a single covariate can be used. Please specify one, you have specified $n_cov: $(ops[:norm_disc_cov]).")
+			normCovOnehot = ops[:o_dco][ops[:norm_disc_cov]]
+			subset_logical = [Bool.(normCovOnehot[ll, :]) for ll in 1:size(normCovOnehot, 1)]
+			output_data_i = [BluntXthPercentile(dataFile, ops, ii, OUT_TYPE = OUT_TYPE) for ii in subset_logical]
+			output_data = foldl((x, y) -> innerjoin(x, y, on = names(x)[1]), output_data_i)
+		else
+			subset_logical = repeat([true], size(dataFile)[2]-1)
+			output_data = BluntXthPercentile(dataFile, ops, subset_logical, OUT_TYPE = OUT_TYPE)
+		end
+	end
+	return output_data
+end
+
+function BluntXthPercentile(dataFile::T, options, subset_logical; OUT_TYPE = DataFrame) where T <: Union{DataFrame, Array{T2, 2}} where T2 <: Union{Float32, Float64}
+	
+	my_info("BLUNTING OUTLIERS IN DATASET.")
+	
+	data = dataFile
+
+	if typeof(dataFile) == DataFrame
+		data = MakeFloat(dataFile[options[:o_fxr]:end, 2:end])[:, subset_logical]
+	end
+	ngene, nsamples = size(data)
+	nfloor = Int(1 + floor((1 - options[:blunt_percent]) * nsamples))
+	nceiling = Int(ceil(options[:blunt_percent] * nsamples))
+	sorted_data = sort(data, dims = 2)
+	row_min = sorted_data[:, nfloor]
+	row_max = sorted_data[:, nceiling]
+	too_small = data .< row_min
+	too_large = data .> row_max
+	for ii in 1:ngene
+		below_min_logical = data[ii, :] .< row_min[ii]
+		above_max_logical = data[ii, :] .> row_max[ii]
+		data[ii, below_min_logical] .= row_min[ii]
+		data[ii, above_max_logical] .= row_max[ii]
+	end
+	if OUT_TYPE == DataFrame
+		bluntedDataFile = DataFrame(hcat(Array(dataFile[:, 1]), vcat(Array(dataFile[1:options[:o_fxr]-1, [false;subset_logical]]), data)), names(dataFile)[[true;subset_logical]])
+		return bluntedDataFile
+	end
+	output_data = Array{OUT_TYPE, 2}(data)
+	return output_data
+end
+
 function BluntXthPercentile(dataFile::T, options; OUT_TYPE = DataFrame) where T <: Union{DataFrame, Array{T2, 2}} where T2 <: Union{Float32, Float64}
 	
 	my_info("BLUNTING OUTLIERS IN DATASET.")
@@ -1548,12 +1616,13 @@ function BluntXthPercentile(dataFile::T, options; OUT_TYPE = DataFrame) where T 
 		data[ii, above_max_logical] .= row_max[ii]
 	end
 	if OUT_TYPE == DataFrame
-		bluntedDataFile = DataFrame(hcat(Array(dataFile[:, 1]), vcat(Array(dataFile[1:options[:o_fxr]-1, 2:end]), data)), names(dataFile))
+		bluntedDataFile = DataFrame(hcat(Array(dataFile[:, 1]), vcat(Array(dataFile[1:options[:o_fxr]-1, :]), data)), names(dataFile))
 		return bluntedDataFile
 	end
 	output_data = Array{OUT_TYPE, 2}(data)
 	return output_data
 end
+
 
 function BluntXthPercentile(original_dataFile_used::T, new_dataFile_to_use::T, options; OUT_TYPE = DataFrame) where T <: Union{DataFrame, Array{Float32, 2}, Array{Float64, 2}}
 	
@@ -2029,7 +2098,8 @@ function SVDReduceDimensions(S, S_logical, ops)
 	ReductionDim1 = findfirst(x -> x > ops[:eigen_total_var], cumvar) # How many eigengenes need to be included to have captured the minimum (user specified) variance from the eigengenes (from their singular values)
 	my_info("$ReductionDim1 DIMENSIONS REQUIRED TO CAPTURE $(trunc(100 * ops[:eigen_total_var], digits = 1))% OF THE REMAINING VARIANCE.")
 	if ReductionDim1 < 2
-		my_error("THE TOTAL VARIANCE LIMIT REDUCES THE # OF EIGEN GENE DIMENSIONS TO $ReductionDim1. PLEASE INCREASE :eigen_total_var.")
+		my_warn("THE TOTAL VARIANCE LIMIT REDUCES THE # OF EIGEN GENE DIMENSIONS TO $ReductionDim1. SETTING DIMENSION TO 2. PLEASE INCREASE :eigen_total_var TO CAPTURE MORE DIMENSIONS.")
+		ReductionDim1 = 2
 	end
 	# println("\nS[1] = $(S[1])")
     ReductionDim2 = findlast(x -> x > ops[:eigen_contr_var], vardiff) # which eigengenes contribute the minimum (user specified) variance
@@ -2041,7 +2111,8 @@ function SVDReduceDimensions(S, S_logical, ops)
 	end
 	my_info("THE $ReductionDim2$number_suffix DIMENSION IS THE LAST DIMENSION TO CONTRIBUTE AT LEAST $(trunc(100 * ops[:eigen_contr_var], digits = 1))% VARIANCE.")
 	if ReductionDim2 < 2
-		my_error("THE INDIVIDUAL VARIANCE LIMIT REDUCES THE # OF EIGEN GENE DIMENSIONS TO $ReductionDim2. PLEASE DECREASE :eigen_contr_var.")
+		my_warn("THE INDIVIDUAL VARIANCE LIMIT REDUCES THE # OF EIGEN GENE DIMENSIONS TO $ReductionDim2. SETTING DIMENSION TO 2. PLEASE DECREASE :eigen_contr_var TO CAPTURE MORE DIMENSIONS.")
+		ReductionDim2 = 2
 	end
 	if ReductionDim2 < ReductionDim1
 		my_warn("CONTRIBUTED VARIANCE OF INDIVIDUAL EIGENGENES IS LIMITING THE TOTAL VARIANCE CAPTURED")
@@ -2195,7 +2266,7 @@ function Eigengenes!(dataFile, genesOfInterest, ops)
 
 	CovariateProcessing!(dataFile, ops) # returns updated options. Look at function CovariateProcessing to see the long hand for each of the new keys added to the dictionary
 
-	bluntedDataFile = BluntXthPercentile(dataFile, ops, OUT_TYPE=DataFrame)
+	bluntedDataFile = GetBluntXthPercentile(dataFile, ops, OUT_TYPE=DataFrame)
 	
 	keepGenesOfInterestExpressionData, ~ = GeneLevelCutoffs(bluntedDataFile, genesOfInterest, ops)
 
@@ -2769,10 +2840,7 @@ function OutputFolders(ouput_path, ops)
 	println("\tCREATING OUTPUT FOLDER\n\n")
 	CheckPath!(ouput_path)
 	todays_date = replace(string(floor(now(), Dates.Minute(1))), ":"=>"_")
-	default_change_folder_string = CheckDefaultDict(ops)
-	default_change_folder_string = replace(default_change_folder_string, "."=>"_")
-	path_extentsion = join([todays_date, default_change_folder_string], "_")
-	master_output_folder_path = joinpath(ouput_path, path_extentsion)
+	master_output_folder_path = joinpath(ouput_path, join(["CYCLOPS", todays_date], "_"))
 	master_output_folder_path = CheckPath(master_output_folder_path)
 	println("\tOUTPUTS WILL BE SAVED IN $(master_output_folder_path)\n\n")
 	all_subfolder_paths = Array{Any}([])
@@ -3264,10 +3332,10 @@ function GetCosSSELineAttributes(eP, gea, ops, s::Float64 = 0)
 		b_coeffs_for_amp_ratio[:, 2:end] = b_coeffs_for_amp_ratio[:, 1] .+ b_coeffs_for_amp_ratio[:, 2:end]
 	end
 	samples_per_batch = sum(usable_covariates, dims=1)
-	samples_batch_0 = size(usable_covariates, 2) - sum(samples_per_batch)
-	total_samples_per_batch = [samples_batch_0 samples_per_batch]
-	total_n_samples = sum(samples_per_batch) + samples_batch_0
-	Weighted_Average_Offset = sum(b_coeffs_for_amp_ratio .* total_samples_per_batch, dims=2) ./ total_n_samples
+	samples_batch_0 = size(usable_covariates, 2) - sum(samples_per_batch) # questionable
+	total_samples_per_batch = [samples_batch_0 samples_per_batch] # questionable
+	total_n_samples = sum(samples_per_batch) + samples_batch_0 # questionable
+	Weighted_Average_Offset = sum(b_coeffs_for_amp_ratio .* total_samples_per_batch, dims=2) ./ total_n_samples # questionable
 	predicted_values = m_coeffs * gradient_terms' .+ b_coeffs * b_terms'
 	SSE = sse(gea, predicted_values, dims = 2)
 	Amplitude = sqrt.((sin_m_coeffs .^ 2) .+ (cos_m_coeffs .^ 2))
@@ -3753,18 +3821,22 @@ function Align(dataFile::DataFrame, Fit_Output::DataFrame, Eigengene_Correlation
 	
 	my_info("ALIGNMENT TO MOUSE ATLAS ACROPHASES.")
 	align_genes, align_acrophases = human_homologue_gene_symbol, mouse_acrophases
-	Fit_Output[!, :Phases_MA], Align_Genes_Cosine_Fit, Acrophase_Plot_Info_Array = AlignAcrophases(dataFile, Fit_Output, ops, align_genes, align_acrophases)
-	if sum(Acrophase_Plot_Info_Array[end] .< 0.05) > 0
-		Acrophase(Acrophase_Plot_Info_Array..., 0.05, space_factor = pi/15)
-		title("Acrophase Alignment to Mouse Atlas", pad = 32)
-		my_info("SAVING FIGURE.")
-		savefig(joinpath(plot_path_l, "Mouse_Atlas_Aligned_Acrophase_Plot_$(todays_date).png"), bbox_inches = "tight", dpi = 300)
-		my_info("FIGURE SAVED. CLOSING FIGURE.")
-		close()
-		my_info("FIGURE CLOSED. SAVING COSINE FIT.")
+	if (length(findXinY(align_genes, dataFile[:, 1])) > 0)
+		Fit_Output[!, :Phases_MA], Align_Genes_Cosine_Fit, Acrophase_Plot_Info_Array = AlignAcrophases(dataFile, Fit_Output, ops, align_genes, align_acrophases)
+		
+		if sum(Acrophase_Plot_Info_Array[end] .< 0.05) > 0
+			Acrophase(Acrophase_Plot_Info_Array..., 0.05, space_factor = pi/15)
+			title("Acrophase Alignment to Mouse Atlas", pad = 32)
+			my_info("SAVING FIGURE.")
+			savefig(joinpath(plot_path_l, "Mouse_Atlas_Aligned_Acrophase_Plot_$(todays_date).png"), bbox_inches = "tight", dpi = 300)
+			my_info("FIGURE SAVED. CLOSING FIGURE.")
+			close()
+			my_info("FIGURE CLOSED. SAVING COSINE FIT.")
+		end
+		
+		CSV.write(joinpath(fit_path_l, "Mouse_Atlas_Aligned_Cosine_Fit_$(todays_date).csv"), Align_Genes_Cosine_Fit)
+		my_info("COSINE FIT SAVED. SAVING FIT OUTPUT.")
 	end
-	CSV.write(joinpath(fit_path_l, "Mouse_Atlas_Aligned_Cosine_Fit_$(todays_date).csv"), Align_Genes_Cosine_Fit)
-	my_info("COSINE FIT SAVED. SAVING FIT OUTPUT.")
 	CSV.write(joinpath(fit_path_l, "Fit_Output_$(todays_date).csv"), Fit_Output)
 	my_info("FIT OUTPUT SAVED. SAVING METRIC CORRELATIONS TO EIGENGENES.")
 	CSV.write(joinpath(fit_path_l, "Metric_Correlation_to_Eigengenes_$(todays_date).csv"), Eigengene_Correlation)
@@ -3807,6 +3879,9 @@ end
 # Metric Function #
 ###################
 function Circular_Mean(phases::Array{T,1} where T <: Union{Float64, Float32})
+	if length(phases) < 1
+		return NaN
+	end
   sinterm=sum(sin.(phases))
   costerm=sum(cos.(phases))
   return mod(atan(sinterm, costerm), 2pi)
