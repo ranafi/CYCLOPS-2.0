@@ -1232,7 +1232,7 @@ end
 ######################
 # Training Functions #
 ######################
-function TrainCovariates(m, gea_vectorized; MinSteps::Int = 250, MaxSteps::Int = 1000, μA = 0.0001, β = (0.9, 0.999), cutoff::Int = 1000)
+function TrainCovariates(m, gea_vectorized; MinSteps::Int = 250, MaxSteps::Int = 1000, μA = 0.0001, β = (0.9, 0.999), cutoff::Int = 1000, verbose = true, freeze_covs = false)
 	local c1 = 0
 	local c2 = 0
 	local c3 = 0
@@ -1245,7 +1245,11 @@ function TrainCovariates(m, gea_vectorized; MinSteps::Int = 250, MaxSteps::Int =
 		μA_original = μA
 		while c1 < MinSteps
 			c1 += 1
-			Flux.train!(x->mse(m(x), x[1:m.o]), Flux.params(m.S_OH, m.B, m.B_OH, m.L1, m.L2), zip(gea_vectorized), ADAM(μA, β), cb = () -> ())
+			if freeze_covs
+				Flux.train!(x->mse(m(x), x[1:m.o]), Flux.params(m.L1, m.L2), zip(gea_vectorized), ADAM(μA, β), cb = () -> ())
+			else
+				Flux.train!(x->mse(m(x), x[1:m.o]), Flux.params(m.S_OH, m.B, m.B_OH, m.L1, m.L2), zip(gea_vectorized), ADAM(μA, β), cb = () -> ())
+			end
 		end
 		
 		smallest_μA = μA
@@ -1257,7 +1261,11 @@ function TrainCovariates(m, gea_vectorized; MinSteps::Int = 250, MaxSteps::Int =
 			μA = μA * 1.05
 			before = mean(map(x -> mse(m(x), x[1:m.o]), gea_vectorized))
 			before_m = deepcopy(m)
-			Flux.train!(x->mse(m(x), x[1:m.o]), Flux.params(m.S_OH, m.B, m.B_OH, m.L1, m.L2), zip(gea_vectorized), ADAM(μA, β), cb = () -> ())
+			if freeze_covs
+				Flux.train!(x->mse(m(x), x[1:m.o]), Flux.params(m.L1, m.L2), zip(gea_vectorized), ADAM(μA, β), cb = () -> ())
+			else
+				Flux.train!(x->mse(m(x), x[1:m.o]), Flux.params(m.S_OH, m.B, m.B_OH, m.L1, m.L2), zip(gea_vectorized), ADAM(μA, β), cb = () -> ())
+			end
 			after = mean(map(x -> mse(m(x), x[1:m.o]), gea_vectorized))
 			change = before - after
 
@@ -1266,7 +1274,11 @@ function TrainCovariates(m, gea_vectorized; MinSteps::Int = 250, MaxSteps::Int =
 				c4 += 1
 				μA = μA * 0.5
 				m = before_m
-				Flux.train!(x->mse(m(x), x[1:m.o]), Flux.params(m.S_OH, m.B, m.B_OH, m.L1, m.L2), zip(gea_vectorized), ADAM(μA, β), cb = () -> ())
+				if freeze_covs
+					Flux.train!(x->mse(m(x), x[1:m.o]), Flux.params(m.L1, m.L2), zip(gea_vectorized), ADAM(μA, β), cb = () -> ())
+				else
+					Flux.train!(x->mse(m(x), x[1:m.o]), Flux.params(m.S_OH, m.B, m.B_OH, m.L1, m.L2), zip(gea_vectorized), ADAM(μA, β), cb = () -> ())
+				end
 				after = mean(map(x -> mse(m(x), x[1:m.o]), gea_vectorized))
 				change = before - after
 			end
@@ -1287,8 +1299,9 @@ function TrainCovariates(m, gea_vectorized; MinSteps::Int = 250, MaxSteps::Int =
 			c4 = 0
 
 		end
-		
-		println("Model took $(c1 + c2) total training steps. Of these, $(c2) were variable learning rate steps.\nThe learning rate was decreased $c3 times and was smaller than the original learning rate for $c5 steps.\nThe learning rate was increased $c2 times and was larger than the original learning rate for $c6 steps.\nThe final learning rate was $(trunc(μA, sigdigits = 4)); the smallest the learning rate became was $(smallest_μA) and the largest it became was $(largest_μA).\n\n~~~~~~~~~~~~TRAINING COMPLETE~~~~~~~~~~~~\n\n")
+		if verbose
+			println("Model took $(c1 + c2) total training steps. Of these, $(c2) were variable learning rate steps.\nThe learning rate was decreased $c3 times and was smaller than the original learning rate for $c5 steps.\nThe learning rate was increased $c2 times and was larger than the original learning rate for $c6 steps.\nThe final learning rate was $(trunc(μA, sigdigits = 4)); the smallest the learning rate became was $(smallest_μA) and the largest it became was $(largest_μA).\n\n~~~~~~~~~~~~TRAINING COMPLETE~~~~~~~~~~~~\n\n")
+		end
 
 	catch e
 		println("An error occured in training. $(c1 + c2) steps ($(c2) variable) were taken before the error occured.")
@@ -1487,7 +1500,7 @@ function TrainOrder(m, gea_vectorized; MinSteps::Int = 250, MaxSteps::Int = 1000
 	return m # ", after" removed because OrderDecoder not setup to handle tuple of model and erro
 end
 
-function MultiTrainCovariates(m_array, gea::Array{Float32,2}, options)
+function MultiTrainCovariates(m_array, gea::Array{Float32,2}, options; verbose = true, freeze_covs = false)
 	trained_models = Array{Any}([])
 	gea_vectorized = mapslices(x -> [x], gea, dims = 1)[:]
 	if options[:train_circular]
@@ -1504,7 +1517,7 @@ function MultiTrainCovariates(m_array, gea::Array{Float32,2}, options)
 		collection_times_with_flag_vectorized = mapslices(x -> [Float32.(x)], hcat(init_collection_time_flag, init_collection_time)', dims = 1)[:]
 		append!(trained_models, pmap(x -> TrainCovariatesTrueTimes(x, gea_vectorized, collection_times_with_flag_vectorized, μA = options[:train_μA], β = options[:train_β], MinSteps = options[:train_min_steps], MaxSteps = options[:train_max_steps], cutoff = options[:train_μA_scale_lim], collection_time_balance = options[:train_collection_time_balance]), m_array, on_error = e -> rethrow(e))) # Error here leads to 449
 	else
-		append!(trained_models, pmap(x -> TrainCovariates(x, gea_vectorized, μA = options[:train_μA], β = options[:train_β], MinSteps = options[:train_min_steps], MaxSteps = options[:train_max_steps], cutoff = options[:train_μA_scale_lim]), m_array))
+		append!(trained_models, pmap(x -> TrainCovariates(x, gea_vectorized, μA = options[:train_μA], β = options[:train_β], MinSteps = options[:train_min_steps], MaxSteps = options[:train_max_steps], cutoff = options[:train_μA_scale_lim], verbose = verbose, freeze_covs = freeze_covs), m_array))
 	end
 	return trained_models
 end
@@ -1616,7 +1629,7 @@ function BluntXthPercentile(dataFile::T, options; OUT_TYPE = DataFrame) where T 
 		data[ii, above_max_logical] .= row_max[ii]
 	end
 	if OUT_TYPE == DataFrame
-		bluntedDataFile = DataFrame(hcat(Array(dataFile[:, 1]), vcat(Array(dataFile[1:options[:o_fxr]-1, :]), data)), names(dataFile))
+		bluntedDataFile = DataFrame(hcat(Array(dataFile[:, 1]), vcat(Array(dataFile[1:options[:o_fxr]-1, 2:end]), data)), names(dataFile))
 		return bluntedDataFile
 	end
 	output_data = Array{OUT_TYPE, 2}(data)
@@ -2268,7 +2281,7 @@ function Eigengenes!(dataFile, genesOfInterest, ops)
 
 	bluntedDataFile = GetBluntXthPercentile(dataFile, ops, OUT_TYPE=DataFrame)
 	
-	keepGenesOfInterestExpressionData, ~ = GeneLevelCutoffs(bluntedDataFile, genesOfInterest, ops)
+	keepGenesOfInterestExpressionData, genesOfInterestIndicesToKeep = GeneLevelCutoffs(bluntedDataFile, genesOfInterest, ops)
 
 	meanNormalizedData = GetMeanNormalizedData(keepGenesOfInterestExpressionData, ops)
 
@@ -2286,7 +2299,7 @@ function Eigengenes!(dataFile, genesOfInterest, ops)
 
 	OHTransform = CovariateOnehotEncoder!(Transform, ops)
 
-	return OHTransform
+	return OHTransform, genesOfInterestIndicesToKeep
 end
 
 function SVDtransfer(data, svd_obj)
@@ -2450,89 +2463,89 @@ function Eigengenes_d1_reapply!(dataFile1, dataFile2, dataFile3, genesOfInterest
 	return OHTransform3, ops3
 end
 
-function Eigengenes_Seed_Intersect_d1_svd!(dataFile1, dataFile2, genesOfInterest, ops, test)
+# function Eigengenes_Seed_Intersect_d1_svd!(dataFile1, dataFile2, genesOfInterest, ops, test)
 	
-	symbols_of_1_in_2 = findXinY(dataFile1[:, 1], dataFile2[:, 1])
+# 	symbols_of_1_in_2 = findXinY(dataFile1[:, 1], dataFile2[:, 1])
 
-	dataFile2_overlap = dataFile2[symbols_of_1_in_2, :]
+# 	dataFile2_overlap = dataFile2[symbols_of_1_in_2, :]
 
-	ops1 = DefaultDict(ops)
-	ops2 = DefaultDict(ops)
+# 	ops1 = DefaultDict(ops)
+# 	ops2 = DefaultDict(ops)
 
-	CovariateProcessing!(dataFile1, ops1)
-	CovariateProcessing!(dataFile2_overlap, ops2) # returns updated options. Look at function CovariateProcessing to see the long hand for each of the new keys added to the dictionary
+# 	CovariateProcessing!(dataFile1, ops1)
+# 	CovariateProcessing!(dataFile2_overlap, ops2) # returns updated options. Look at function CovariateProcessing to see the long hand for each of the new keys added to the dictionary
 	
-	bluntedDataFile1 = BluntXthPercentile(dataFile1, ops1, OUT_TYPE=DataFrame)
-	bluntedDataFile2 = BluntXthPercentile(dataFile2_overlap, ops2, OUT_TYPE=DataFrame)
+# 	bluntedDataFile1 = BluntXthPercentile(dataFile1, ops1, OUT_TYPE=DataFrame)
+# 	bluntedDataFile2 = BluntXthPercentile(dataFile2_overlap, ops2, OUT_TYPE=DataFrame)
 
-	keepGenesOfInterestExpressionData1, gene_of_interest_indices1 = GeneLevelCutoffs(bluntedDataFile1, genesOfInterest, ops1)
-	keepGenesOfInterestExpressionData2, gene_of_interest_indices2 = GeneLevelCutoffs(bluntedDataFile2, genesOfInterest, ops2)
-	intersect_rows = intersect(gene_of_interest_indices1, gene_of_interest_indices2)
-	ops1[:o_seed_genes] = dataFile1[intersect_rows .+ ops1[:o_fxr] .- 1,1]
-	ops2[:o_seed_genes] = ops1[:o_seed_genes]
+# 	keepGenesOfInterestExpressionData1, gene_of_interest_indices1 = GeneLevelCutoffs(bluntedDataFile1, genesOfInterest, ops1)
+# 	keepGenesOfInterestExpressionData2, gene_of_interest_indices2 = GeneLevelCutoffs(bluntedDataFile2, genesOfInterest, ops2)
+# 	intersect_rows = intersect(gene_of_interest_indices1, gene_of_interest_indices2)
+# 	ops1[:o_seed_genes] = dataFile1[intersect_rows .+ ops1[:o_fxr] .- 1,1]
+# 	ops2[:o_seed_genes] = ops1[:o_seed_genes]
 	
-	keepGenesOfInterestExpressionData1 = Array{Float64}(bluntedDataFile1[intersect_rows .+ ops1[:o_fxr] .- 1, 2:end])
-	keepGenesOfInterestExpressionData2 = Array{Float64}(bluntedDataFile2[intersect_rows .+ ops2[:o_fxr] .- 1, 2:end])
+# 	keepGenesOfInterestExpressionData1 = Array{Float64}(bluntedDataFile1[intersect_rows .+ ops1[:o_fxr] .- 1, 2:end])
+# 	keepGenesOfInterestExpressionData2 = Array{Float64}(bluntedDataFile2[intersect_rows .+ ops2[:o_fxr] .- 1, 2:end])
 
-	meanNormalizedData1 = GetMeanNormalizedData(keepGenesOfInterestExpressionData1, ops1)
-	meanNormalizedData2 = GetMeanNormalizedData(keepGenesOfInterestExpressionData2, ops2)
+# 	meanNormalizedData1 = GetMeanNormalizedData(keepGenesOfInterestExpressionData1, ops1)
+# 	meanNormalizedData2 = GetMeanNormalizedData(keepGenesOfInterestExpressionData2, ops2)
 
-	V1, Vt1, S1, cumvar1, svd_obj1 = SVDTransform!(meanNormalizedData1, ops1)
-	ops2[:o_svd_S] = ops1[:o_svd_S]
-	ops2[:o_svd_U] = ops1[:o_svd_U]
-	ops2[:o_svd_cumvar] = ops1[:o_svd_cumvar]
-	ops2[:o_svd_dimvar] = ops1[:o_svd_dimvar]
-	Vt2 = SVDtransfer(meanNormalizedData2, svd_obj1)
-	ops2[:o_svd_V] = transpose(Vt2)
+# 	V1, Vt1, S1, cumvar1, svd_obj1 = SVDTransform!(meanNormalizedData1, ops1)
+# 	ops2[:o_svd_S] = ops1[:o_svd_S]
+# 	ops2[:o_svd_U] = ops1[:o_svd_U]
+# 	ops2[:o_svd_cumvar] = ops1[:o_svd_cumvar]
+# 	ops2[:o_svd_dimvar] = ops1[:o_svd_dimvar]
+# 	Vt2 = SVDtransfer(meanNormalizedData2, svd_obj1)
+# 	ops2[:o_svd_V] = transpose(Vt2)
 
-	SVDBatchRegression!(ops2[:o_svd_V], Vt2, ops2)
+# 	SVDBatchRegression!(ops2[:o_svd_V], Vt2, ops2)
 
-	dimension_indices = SVDRegressionExclusion(ops2[:o_svd_S], ops2)
+# 	dimension_indices = SVDRegressionExclusion(ops2[:o_svd_S], ops2)
 
-	Transform2 = 10 * Vt2[dimension_indices, :]
+# 	Transform2 = 10 * Vt2[dimension_indices, :]
 
-	OHTransform2 = CovariateOnehotEncoder!(Transform2, ops2)
+# 	OHTransform2 = CovariateOnehotEncoder!(Transform2, ops2)
 
-	return OHTransform2, ops2
-end
+# 	return OHTransform2, ops2
+# end
 
-function Eigengenes_Seed_Intersect_d2_svd!(dataFile1, dataFile2, genesOfInterest, ops, test)
+# function Eigengenes_Seed_Intersect_d2_svd!(dataFile1, dataFile2, genesOfInterest, ops, test)
 	
-	symbols_of_1_in_2 = findXinY(dataFile1[:, 1], dataFile2[:, 1])
+# 	symbols_of_1_in_2 = findXinY(dataFile1[:, 1], dataFile2[:, 1])
 
-	dataFile2_overlap = dataFile2[symbols_of_1_in_2, :]
+# 	dataFile2_overlap = dataFile2[symbols_of_1_in_2, :]
 
-	ops1 = DefaultDict(ops)
-	ops2 = DefaultDict(ops)
+# 	ops1 = DefaultDict(ops)
+# 	ops2 = DefaultDict(ops)
 
-	CovariateProcessing!(dataFile1, ops1)
-	CovariateProcessing!(dataFile2_overlap, ops2) # returns updated options. Look at function CovariateProcessing to see the long hand for each of the new keys added to the dictionary
+# 	CovariateProcessing!(dataFile1, ops1)
+# 	CovariateProcessing!(dataFile2_overlap, ops2) # returns updated options. Look at function CovariateProcessing to see the long hand for each of the new keys added to the dictionary
 	
-	bluntedDataFile1 = BluntXthPercentile(dataFile1, ops1, OUT_TYPE=DataFrame)
-	bluntedDataFile2 = BluntXthPercentile(dataFile2_overlap, ops2, OUT_TYPE=DataFrame)
+# 	bluntedDataFile1 = BluntXthPercentile(dataFile1, ops1, OUT_TYPE=DataFrame)
+# 	bluntedDataFile2 = BluntXthPercentile(dataFile2_overlap, ops2, OUT_TYPE=DataFrame)
 
-	keepGenesOfInterestExpressionData1, gene_of_interest_indices1 = GeneLevelCutoffs(bluntedDataFile1, genesOfInterest, ops1)
-	keepGenesOfInterestExpressionData2, gene_of_interest_indices2 = GeneLevelCutoffs(bluntedDataFile2, genesOfInterest, ops2)
-	intersect_rows = intersect(gene_of_interest_indices1, gene_of_interest_indices2)
-	ops1[:o_seed_genes] = dataFile1[intersect_rows .+ ops1[:o_fxr] .- 1,1]
-	ops2[:o_seed_genes] = ops1[:o_seed_genes]
+# 	keepGenesOfInterestExpressionData1, gene_of_interest_indices1 = GeneLevelCutoffs(bluntedDataFile1, genesOfInterest, ops1)
+# 	keepGenesOfInterestExpressionData2, gene_of_interest_indices2 = GeneLevelCutoffs(bluntedDataFile2, genesOfInterest, ops2)
+# 	intersect_rows = intersect(gene_of_interest_indices1, gene_of_interest_indices2)
+# 	ops1[:o_seed_genes] = dataFile1[intersect_rows .+ ops1[:o_fxr] .- 1,1]
+# 	ops2[:o_seed_genes] = ops1[:o_seed_genes]
 	
-	keepGenesOfInterestExpressionData2 = Array{Float64}(bluntedDataFile2[intersect_rows .+ ops2[:o_fxr] .- 1, 2:end])
+# 	keepGenesOfInterestExpressionData2 = Array{Float64}(bluntedDataFile2[intersect_rows .+ ops2[:o_fxr] .- 1, 2:end])
 
-	meanNormalizedData2 = GetMeanNormalizedData(keepGenesOfInterestExpressionData2, ops2)
+# 	meanNormalizedData2 = GetMeanNormalizedData(keepGenesOfInterestExpressionData2, ops2)
 
-	V2, Vt2, S2, cumvar2, svd_obj2 = SVDTransform!(meanNormalizedData2, ops2)
+# 	V2, Vt2, S2, cumvar2, svd_obj2 = SVDTransform!(meanNormalizedData2, ops2)
 
-	SVDBatchRegression!(V2, Vt2, ops2)
+# 	SVDBatchRegression!(V2, Vt2, ops2)
 
-	dimension_indices = SVDRegressionExclusion(S2, ops2)
+# 	dimension_indices = SVDRegressionExclusion(S2, ops2)
 
-	Transform2 = 10 * Vt2[dimension_indices, :]
+# 	Transform2 = 10 * Vt2[dimension_indices, :]
 
-	OHTransform2 = CovariateOnehotEncoder!(Transform2, ops2)
+# 	OHTransform2 = CovariateOnehotEncoder!(Transform2, ops2)
 
-	return OHTransform2, ops2
-end
+# 	return OHTransform2, ops2
+# end
 
 function MetricCovariateConcatenator(metrics, options, _verbose = false)
 	if size(metrics, 2) > 12
@@ -2570,7 +2583,7 @@ end
 function Fit(dataFile, genesOfInterest, alternateOps = Dict(); _verbose = false)
 	
 	options = DefaultDict(alternateOps)
-	eigen_data = Eigengenes!(dataFile, genesOfInterest, options)
+	eigen_data, ~ = Eigengenes!(dataFile, genesOfInterest, options)
 	
 	Random.seed!(1234);
 	initialized_models = InitializeModel(eigen_data, options)
@@ -2598,6 +2611,8 @@ function Fit(dataFile, genesOfInterest, alternateOps = Dict(); _verbose = false)
 	return eigen_data, metricDataframe, correlationDataframe, best_model, options
 end
 
+# Regular reapply fit
+# This function takes a trained model and applies it to a subset of a dataframe
 function ReApplyFit(trainedModel, dataFile1, dataFile2, genesOfInterest, ops; _verbose=false, matching_symbols=true)
 	
 	options = DefaultDict(ops)
@@ -2627,6 +2642,12 @@ function ReApplyFit(trainedModel, dataFile1, dataFile2, genesOfInterest, ops; _v
 	return dataFile2_transform, metricDataframe, correlationDataframe, best_model, dataFile2_ops
 end
 
+# Reapply fit after using TransferFit_d1
+# Scenario: You have 'control' and 'treatment' subjects.
+# Arguments: dataFile1 is the 'control' subset of the data, dataFile2 includes all subject groups, dataFile3 is the 'controls' again.
+# Alternatively dataFile3 is the 'treatment' subset of samples.
+# You apply the SVD of dataFile1 to dataFile2.
+# See TransferFit_d1 if you use this function.
 function ReApplyFit_d1(trainedModel, dataFile1, dataFile2, dataFile3, genesOfInterest, ops; _verbose=false, matching_symbols=true)
 	
 	options = DefaultDict(ops)
@@ -2656,35 +2677,40 @@ function ReApplyFit_d1(trainedModel, dataFile1, dataFile2, dataFile3, genesOfInt
 	return dataFile3_transform, metricDataframe, correlationDataframe, best_model, dataFile3_ops
 end
 
-function TransferFit(trainedModel, dataFile1::DataFrame, dataFile2::DataFrame, genesOfInterest::Array{String,1}, ops::Dict{Symbol,Any}; _verbose=false, matching_symbols=true)
-	~, (dataFile2_transform, dataFile2_ops) = Eigengenes!(dataFile1, dataFile2, genesOfInterest, ops, matching_symbols)
+# function TransferFit(trainedModel, dataFile1::DataFrame, dataFile2::DataFrame, genesOfInterest::Array{String,1}, ops::Dict{Symbol,Any}; _verbose=false, matching_symbols=true)
+# 	~, (dataFile2_transform, dataFile2_ops) = Eigengenes!(dataFile1, dataFile2, genesOfInterest, ops, matching_symbols)
 
-	no_covariates = (size(dataFile2_transform, 1) == dataFile2_ops[:o_svd_n_dims])
+# 	no_covariates = (size(dataFile2_transform, 1) == dataFile2_ops[:o_svd_n_dims])
 
-	if no_covariates
-		transfer_trained_model = MultiTrainOrder([trainedModel], dataFile2_transform, dataFile2_ops)
-		~, output_phases = OrderDecoder(transfer_trained_model, dataFile2_transform)
-		output_overall_mses = Array{Float32, 1}(reshape(mapslices(x -> mse(transfer_trained_model(x), x[1:transfer_trained_model.o]), dataFile2_transform, dims = 1), :, 1)[:, 1])
-		output_projections = OrderProjection(transfer_trained_model, dataFile2_transform)
-		output_magnitudes = OrderMagnitude(transfer_trained_model, dataFile2_transform)
-	else
-		transfer_trained_model = MultiTrainCovariates([trainedModel], dataFile2_transform, dataFile2_ops)
-		~, model_metrics = CovariatesDecoder(transfer_trained_model, dataFile2_transform)
-	end
+# 	if no_covariates
+# 		transfer_trained_model = MultiTrainOrder([trainedModel], dataFile2_transform, dataFile2_ops)
+# 		~, output_phases = OrderDecoder(transfer_trained_model, dataFile2_transform)
+# 		output_overall_mses = Array{Float32, 1}(reshape(mapslices(x -> mse(transfer_trained_model(x), x[1:transfer_trained_model.o]), dataFile2_transform, dims = 1), :, 1)[:, 1])
+# 		output_projections = OrderProjection(transfer_trained_model, dataFile2_transform)
+# 		output_magnitudes = OrderMagnitude(transfer_trained_model, dataFile2_transform)
+# 	else
+# 		transfer_trained_model = MultiTrainCovariates([trainedModel], dataFile2_transform, dataFile2_ops)
+# 		~, model_metrics = CovariatesDecoder(transfer_trained_model, dataFile2_transform)
+# 	end
 
-	metrics = hcat(names(dataFile2)[2:end], model_metrics)
+# 	metrics = hcat(names(dataFile2)[2:end], model_metrics)
 
-	metricDataframe, n_cov = MetricCovariateConcatenator(metrics, dataFile2_ops, _verbose)
+# 	metricDataframe, n_cov = MetricCovariateConcatenator(metrics, dataFile2_ops, _verbose)
 
-	eigengene_metric_pearson_correlations = cor(Float32.(Matrix(metricDataframe[:,2:end-n_cov])), dataFile2_transform[1:best_model.o,:]')
+# 	eigengene_metric_pearson_correlations = cor(Float32.(Matrix(metricDataframe[:,2:end-n_cov])), dataFile2_transform[1:best_model.o,:]')
 
-	correlationDataframe_no_row_names = DataFrame(eigengene_metric_pearson_correlations, [Symbol("Eigengene$ii") for ii in 1:best_model.o])
+# 	correlationDataframe_no_row_names = DataFrame(eigengene_metric_pearson_correlations, [Symbol("Eigengene$ii") for ii in 1:best_model.o])
 
-	correlationDataframe = hcat(DataFrame(MetricName = names(metricDataframe)[2:end-n_cov]), correlationDataframe_no_row_names)
+# 	correlationDataframe = hcat(DataFrame(MetricName = names(metricDataframe)[2:end-n_cov]), correlationDataframe_no_row_names)
 
-	return dataFile2_transform, metricDataframe, correlationDataframe, best_model, dataFile2_ops
-end
+# 	return dataFile2_transform, metricDataframe, correlationDataframe, best_model, dataFile2_ops
+# end
 
+# Transfer Fit function
+# Scenario: You have 'control' and 'treatment' subjects.
+# You apply the SVD of the controls to everyone.
+# Arguments: dataFile1 is the 'control' subset of the data, dataFile2 includes all subject groups.
+# See ReapplyFit_d1 if you use this function.
 function TransferFit_d1(dataFile1::DataFrame, dataFile2::DataFrame, genesOfInterest::Array{String,1}, ops::Dict{Symbol,Any}; _verbose=false)
 	options = DefaultDict(ops)
 	dataFile2_transform, dataFile2_ops = Eigengenes_d1!(dataFile1, dataFile2, genesOfInterest, options, true)
@@ -2715,71 +2741,71 @@ function TransferFit_d1(dataFile1::DataFrame, dataFile2::DataFrame, genesOfInter
 	return dataFile2_transform, metricDataframe, correlationDataframe, best_model, dataFile2_ops
 end
 
-function TransferFit_Intersect_d1_svd(dataFile1::DataFrame, dataFile2::DataFrame, genesOfInterest::Array{String,1}, ops::Dict{Symbol,Any}; _verbose=false)
-	options = DefaultDict(ops)
-	dataFile2_transform, dataFile2_ops = Eigengenes_Seed_Intersect_d1_svd!(dataFile1, dataFile2, genesOfInterest, options, true)
+# function TransferFit_Intersect_d1_svd(dataFile1::DataFrame, dataFile2::DataFrame, genesOfInterest::Array{String,1}, ops::Dict{Symbol,Any}; _verbose=false)
+# 	options = DefaultDict(ops)
+# 	dataFile2_transform, dataFile2_ops = Eigengenes_Seed_Intersect_d1_svd!(dataFile1, dataFile2, genesOfInterest, options, true)
 
-	Random.seed!(1234);
-	initialized_models = InitializeModel(dataFile2_transform, dataFile2_ops)
+# 	Random.seed!(1234);
+# 	initialized_models = InitializeModel(dataFile2_transform, dataFile2_ops)
 	
-	no_covariates = (size(dataFile2_transform, 1) == dataFile2_ops[:o_svd_n_dims])
+# 	no_covariates = (size(dataFile2_transform, 1) == dataFile2_ops[:o_svd_n_dims])
 
-	if no_covariates
-		transfer_trained_models = MultiTrainOrder(initialized_models, dataFile2_transform, dataFile2_ops)
-		best_model, output_phases = OrderDecoder(transfer_trained_models, dataFile2_transform)
-		output_overall_mses = Array{Float32, 1}(reshape(mapslices(x -> mse(best_model(x), x[1:best_model.o]), dataFile2_transform, dims = 1), :, 1)[:, 1])
-		output_projections = OrderProjection(best_model, dataFile2_transform)
-		output_magnitudes = OrderMagnitude(best_model, dataFile2_transform)
-	else
-		transfer_trained_models = MultiTrainCovariates(initialized_models, dataFile2_transform, dataFile2_ops)
-		best_model, model_metrics = CovariatesDecoder(transfer_trained_models, dataFile2_transform)
-	end
+# 	if no_covariates
+# 		transfer_trained_models = MultiTrainOrder(initialized_models, dataFile2_transform, dataFile2_ops)
+# 		best_model, output_phases = OrderDecoder(transfer_trained_models, dataFile2_transform)
+# 		output_overall_mses = Array{Float32, 1}(reshape(mapslices(x -> mse(best_model(x), x[1:best_model.o]), dataFile2_transform, dims = 1), :, 1)[:, 1])
+# 		output_projections = OrderProjection(best_model, dataFile2_transform)
+# 		output_magnitudes = OrderMagnitude(best_model, dataFile2_transform)
+# 	else
+# 		transfer_trained_models = MultiTrainCovariates(initialized_models, dataFile2_transform, dataFile2_ops)
+# 		best_model, model_metrics = CovariatesDecoder(transfer_trained_models, dataFile2_transform)
+# 	end
 
-	metrics = hcat(names(dataFile2)[2:end], model_metrics)
+# 	metrics = hcat(names(dataFile2)[2:end], model_metrics)
 
-	metricDataframe, n_cov = MetricCovariateConcatenator(metrics, dataFile2_ops, _verbose)
+# 	metricDataframe, n_cov = MetricCovariateConcatenator(metrics, dataFile2_ops, _verbose)
 
-	eigengene_metric_pearson_correlations = cor(Float32.(Matrix(metricDataframe[:,2:end-n_cov])), dataFile2_transform[1:best_model.o,:]')
+# 	eigengene_metric_pearson_correlations = cor(Float32.(Matrix(metricDataframe[:,2:end-n_cov])), dataFile2_transform[1:best_model.o,:]')
 
-	correlationDataframe_no_row_names = DataFrame(eigengene_metric_pearson_correlations, [Symbol("Eigengene$ii") for ii in 1:best_model.o])
+# 	correlationDataframe_no_row_names = DataFrame(eigengene_metric_pearson_correlations, [Symbol("Eigengene$ii") for ii in 1:best_model.o])
 
-	correlationDataframe = hcat(DataFrame(MetricName = names(metricDataframe)[2:end-n_cov]), correlationDataframe_no_row_names)
+# 	correlationDataframe = hcat(DataFrame(MetricName = names(metricDataframe)[2:end-n_cov]), correlationDataframe_no_row_names)
 
-	return dataFile2_transform, metricDataframe, correlationDataframe, best_model, dataFile2_ops
-end
+# 	return dataFile2_transform, metricDataframe, correlationDataframe, best_model, dataFile2_ops
+# end
 
-function TransferFit_Intersect_d2_svd(dataFile1::DataFrame, dataFile2::DataFrame, genesOfInterest::Array{String,1}, ops::Dict{Symbol,Any}; _verbose=false)
-	options = DefaultDict(ops)
-	dataFile2_transform, dataFile2_ops = Eigengenes_Seed_Intersect_d2_svd!(dataFile1, dataFile2, genesOfInterest, options, true)
+# function TransferFit_Intersect_d2_svd(dataFile1::DataFrame, dataFile2::DataFrame, genesOfInterest::Array{String,1}, ops::Dict{Symbol,Any}; _verbose=false)
+# 	options = DefaultDict(ops)
+# 	dataFile2_transform, dataFile2_ops = Eigengenes_Seed_Intersect_d2_svd!(dataFile1, dataFile2, genesOfInterest, options, true)
 
-	Random.seed!(1234);
-	initialized_models = InitializeModel(dataFile2_transform, dataFile2_ops)
+# 	Random.seed!(1234);
+# 	initialized_models = InitializeModel(dataFile2_transform, dataFile2_ops)
 	
-	no_covariates = (size(dataFile2_transform, 1) == dataFile2_ops[:o_svd_n_dims])
+# 	no_covariates = (size(dataFile2_transform, 1) == dataFile2_ops[:o_svd_n_dims])
 
-	if no_covariates
-		transfer_trained_models = MultiTrainOrder(initialized_models, dataFile2_transform, dataFile2_ops)
-		best_model, output_phases = OrderDecoder(transfer_trained_models, dataFile2_transform)
-		output_overall_mses = Array{Float32, 1}(reshape(mapslices(x -> mse(best_model(x), x[1:best_model.o]), dataFile2_transform, dims = 1), :, 1)[:, 1])
-		output_projections = OrderProjection(best_model, dataFile2_transform)
-		output_magnitudes = OrderMagnitude(best_model, dataFile2_transform)
-	else
-		transfer_trained_models = MultiTrainCovariates(initialized_models, dataFile2_transform, dataFile2_ops)
-		best_model, model_metrics = CovariatesDecoder(transfer_trained_models, dataFile2_transform)
-	end
+# 	if no_covariates
+# 		transfer_trained_models = MultiTrainOrder(initialized_models, dataFile2_transform, dataFile2_ops)
+# 		best_model, output_phases = OrderDecoder(transfer_trained_models, dataFile2_transform)
+# 		output_overall_mses = Array{Float32, 1}(reshape(mapslices(x -> mse(best_model(x), x[1:best_model.o]), dataFile2_transform, dims = 1), :, 1)[:, 1])
+# 		output_projections = OrderProjection(best_model, dataFile2_transform)
+# 		output_magnitudes = OrderMagnitude(best_model, dataFile2_transform)
+# 	else
+# 		transfer_trained_models = MultiTrainCovariates(initialized_models, dataFile2_transform, dataFile2_ops)
+# 		best_model, model_metrics = CovariatesDecoder(transfer_trained_models, dataFile2_transform)
+# 	end
 
-	metrics = hcat(names(dataFile2)[2:end], model_metrics)
+# 	metrics = hcat(names(dataFile2)[2:end], model_metrics)
 
-	metricDataframe, n_cov = MetricCovariateConcatenator(metrics, dataFile2_ops, _verbose)
+# 	metricDataframe, n_cov = MetricCovariateConcatenator(metrics, dataFile2_ops, _verbose)
 
-	eigengene_metric_pearson_correlations = cor(Float32.(Matrix(metricDataframe[:,2:end-n_cov])), dataFile2_transform[1:best_model.o,:]')
+# 	eigengene_metric_pearson_correlations = cor(Float32.(Matrix(metricDataframe[:,2:end-n_cov])), dataFile2_transform[1:best_model.o,:]')
 
-	correlationDataframe_no_row_names = DataFrame(eigengene_metric_pearson_correlations, [Symbol("Eigengene$ii") for ii in 1:best_model.o])
+# 	correlationDataframe_no_row_names = DataFrame(eigengene_metric_pearson_correlations, [Symbol("Eigengene$ii") for ii in 1:best_model.o])
 
-	correlationDataframe = hcat(DataFrame(MetricName = names(metricDataframe)[2:end-n_cov]), correlationDataframe_no_row_names)
+# 	correlationDataframe = hcat(DataFrame(MetricName = names(metricDataframe)[2:end-n_cov]), correlationDataframe_no_row_names)
 
-	return dataFile2_transform, metricDataframe, correlationDataframe, best_model, dataFile2_ops
-end
+# 	return dataFile2_transform, metricDataframe, correlationDataframe, best_model, dataFile2_ops
+# end
 
 ##############################
 # Cross Validation Functions #
@@ -3332,10 +3358,10 @@ function GetCosSSELineAttributes(eP, gea, ops, s::Float64 = 0)
 		b_coeffs_for_amp_ratio[:, 2:end] = b_coeffs_for_amp_ratio[:, 1] .+ b_coeffs_for_amp_ratio[:, 2:end]
 	end
 	samples_per_batch = sum(usable_covariates, dims=1)
-	samples_batch_0 = size(usable_covariates, 2) - sum(samples_per_batch) # questionable
-	total_samples_per_batch = [samples_batch_0 samples_per_batch] # questionable
-	total_n_samples = sum(samples_per_batch) + samples_batch_0 # questionable
-	Weighted_Average_Offset = sum(b_coeffs_for_amp_ratio .* total_samples_per_batch, dims=2) ./ total_n_samples # questionable
+	samples_batch_0 = size(usable_covariates, 2) - sum(samples_per_batch)
+	total_samples_per_batch = [samples_batch_0 samples_per_batch]
+	total_n_samples = sum(samples_per_batch) + samples_batch_0
+	Weighted_Average_Offset = sum(b_coeffs_for_amp_ratio .* total_samples_per_batch, dims=2) ./ total_n_samples
 	predicted_values = m_coeffs * gradient_terms' .+ b_coeffs * b_terms'
 	SSE = sse(gea, predicted_values, dims = 2)
 	Amplitude = sqrt.((sin_m_coeffs .^ 2) .+ (cos_m_coeffs .^ 2))
@@ -3983,6 +4009,274 @@ function Jammalamadka_Circular_CorrelationMeasures(rphases::T,sphases::T) where 
 	JU =Jammalamadka_Uniform_Circular_Correlations(rphases,sphases)
 	JR =Jammalamadka_Rank_Circular_Correlations(rphases,sphases)
 	return [J, JU, JR]
+end
+
+# This is one performance metric that tests for a smooth trajectory.
+# A return value < 1 is satisfactory.
+# A returns value > 1 is unsatisfactory.
+function smoothness_metric(eigen_data, my_model, Fit_Output; covariates = true)
+
+	if covariates
+		cov_adj_eigengenes = CYCLOPS.CovariatesEncodingOH(eigen_data, my_model) #covariate adjusted eigengenes
+		cov_adj_eigengenes= mapreduce(permutedims, vcat, cov_adj_eigengenes)'
+		decomp = svd(cov_adj_eigengenes)
+		l_eigendata = decomp.Vt
+	else
+		l_eigendata = eigen_data[1:my_model.o, :]
+	end
+	
+	
+	estimated_phaselist = Fit_Output[:,:Phase]
+	
+	estimated_phaselist1s=mod.(estimated_phaselist,2*pi)
+	use_order_c=sortperm(estimated_phaselist1s)
+	use_order_l=sortperm(vec(l_eigendata[1,:]))
+	
+	#new_phaselist=vec(estimated_phaselist1s[use_order_c])
+	circ_eigendata=l_eigendata[:,use_order_c]
+	lin_eigendata=l_eigendata[:,use_order_l]
+	nsamp = size(l_eigendata)[2]
+	
+	gdiffs				=circ_diff(circ_eigendata)
+	gdiffs2				=gdiffs .* gdiffs
+	gdiffsm				=sqrt.(sum(gdiffs2,dims = 1))
+	num					=sum(gdiffsm)/nsamp
+	
+	gdiffs				=diff(lin_eigendata,dims = 2)
+	gdiffs2				=gdiffs .* gdiffs
+	gdiffsm				=sqrt.(sum(gdiffs2, dims = 1))
+	denom				=sum(gdiffsm)/(nsamp-1)
+	measure_eigen		=num/denom
+	return measure_eigen
+	
+end
+
+# This is one performance metric that tests for the presence of a high dimensional ellipse in your data.
+# We do 200 permutations (minimum of 20 for a p value of 0.05).
+# non_shuffled_trial_statErr is the outside error of your linear model minus circular model, all divided by linear model error
+# Then we shuffle either the eigen genes or the seed genes to remove the elliptical structure, recalculating the statistic 200 times to bootstrap.
+# eigenshuffle controls whether you shuffle eigen genes, if false, the function shuffles seed genes before svd.
+# This outputs:
+# 1. The fit output that should match the phases of the regular fit output
+# 2. The dataframe containing the unshuffled stat, the p-value, and the stat error for all shuffle permutations
+function stat_err(dataFile, genesOfInterest, options, output_path; perms = 10, eigen_shuffle = true, freeze_covs = false, covs = true)
+	#function to test if circular parameter fits data better than single linear parameter
+	my_warn("Only test for CYCLOPS with covariates, without true times.")
+	my_info("freeze_covs set to $freeze_covs")
+	eigen_data, genesOfInterestIndicesToKeep = Eigengenes!(dataFile, genesOfInterest, options)
+	
+	#Compute the StatErr for the real data
+	non_shuffled_trial_statErr_tuple = score_circ_vs_linear_bottleneck(eigen_data, options, freeze_covs = freeze_covs,return_best_circ_model = true )
+    non_shuffled_trial_statErr = non_shuffled_trial_statErr_tuple[1]
+    best_model = non_shuffled_trial_statErr_tuple[2]
+    metrics_array = non_shuffled_trial_statErr_tuple[3]
+    metrics = hcat(names(dataFile)[2:end], metrics_array)
+	metricDataframe, n_cov = MetricCovariateConcatenator(metrics, options, true)
+    CSV.write(joinpath(output_path, "statErr_unshuffled_data_best_circular_fit.csv"), metricDataframe)
+
+    my_info("Stat Error for NON SHUFFLED trial: $non_shuffled_trial_statErr")
+	
+	#here shuffle the eigengenes
+    if covs
+	    keep = vcat(1:size(options[:o_covariates])[2], size(options[:o_covariates])[2] .+ genesOfInterestIndicesToKeep) #seed genes idx in TMM
+    else
+        keep = genesOfInterestIndicesToKeep #seed genes idx in TMM
+
+    end
+	reduced_df = dataFile[keep,:]
+	options[:seed_mth_Gene] = length(genesOfInterestIndicesToKeep)-1
+	println(dataFile[keep, 1])
+	my_info("Creating null distribution with $perms permutations.")
+	null_statErr = Vector{Float32}([])
+	for i in 1:perms
+		my_info("Computing perm $i")
+		if eigen_shuffle
+			shuffled_eigen = permute_eigengenes(eigen_data, options)
+			# print(shuffled_eigen[:, 1:10])
+			shuffled_trial_statErr = score_circ_vs_linear_bottleneck(shuffled_eigen, options, freeze_covs = freeze_covs)
+			my_info("StatErr, shuffling eigendata, for perm $i: $shuffled_trial_statErr")
+		else
+			shuffled_seedgenes = permute_seedgenes(reduced_df, options)
+			eigen_data, ~ = Eigengenes!(shuffled_seedgenes, genesOfInterest, options)
+			shuffled_trial_statErr = score_circ_vs_linear_bottleneck(eigen_data, options)
+			my_info("StatErr, shuffling seedgenes, for perm $i: $shuffled_trial_statErr")
+		end
+		append!(null_statErr, shuffled_trial_statErr)
+	end
+
+	p = sum(non_shuffled_trial_statErr .< null_statErr)/perms
+	my_info("Approximate p value for StatError: $p")
+	tmp = vcat(non_shuffled_trial_statErr, p, null_statErr)'
+	tmp_mat = Matrix(tmp)
+	out = DataFrame(tmp_mat, :auto)
+	rename!(out,:1 => :stat_err)
+	rename!(out,:2 => :Pval)
+	fileName = freeze_covs ? "StatErrSummaryFreezeCovs.csv" : "StatErrSummary.csv"
+	fileName = eigen_shuffle ? fileName : "StatErrSummaryShuffleSeedgenes.csv"
+	CSV.write(joinpath(output_path, fileName), out)
+	return(vcat(p, null_statErr))
+end
+
+# Helper function for stat_err
+# Makes circular models
+# Makes linear models
+# Trains them
+# Returns a stat_err
+function score_circ_vs_linear_bottleneck(eigen_data, options; freeze_covs = false, covs = true, return_best_circ_model = false)
+	#Initialize models, trains models, gets best loss from initialized models, returns (linear - circular)/circular error
+	#traditional circular node initialization and training
+	Random.seed!(1234);
+	init_models_circular = InitializeModel(eigen_data, options) #init tradiational cyclops model
+    if covs
+	    trained_models_and_errors_circular = MultiTrainCovariates(init_models_circular, eigen_data, options, verbose = false)
+    else
+        trained_models_and_errors_circular = MultiTrainOrder(init_models_circular, eigen_data, options)
+    end
+    
+
+	best_loss_circular, best_circular_model = getBestLoss(trained_models_and_errors_circular)
+
+	#linear node init and training
+    if covs   #can only freeze covariates if you have them...
+        if freeze_covs
+            init_models_linear = InitializeLinearModelFrozenCovs(eigen_data, options, best_circular_model) #init model without circularnode
+        else
+            init_models_linear = InitializeLinearModel(eigen_data, options) #init model without circularnode
+        end
+    end
+    if covs
+	    trained_models_and_errors_linear = MultiTrainCovariates(init_models_linear, eigen_data, options, verbose = false, freeze_covs =freeze_covs)
+    else
+        trained_models_and_errors_linear = MultiTrainOrder(init_models_linear, eigen_data, options)
+
+    end
+	best_loss_linear, ~ = getBestLoss(trained_models_and_errors_linear)
+	stat = (best_loss_linear - best_loss_circular)/best_loss_linear
+    if return_best_circ_model
+		best_model, metrics_array = CovariatesDecoder(trained_models_and_errors_circular, eigen_data)
+        return(stat, best_model, metrics_array)
+    end
+    return(stat)
+end
+
+# Independently shuffles rows of eigen_data within unique covariate conditions
+function permute_eigengenes(eigen_data, options)
+	eigen_data = eigen_data[1:end-size(options[:o_covariates])[2], :] #eigen genes without cov info
+	covs = options[:o_covariates]'
+	vec_covs = mapslices(x -> [x], covs, dims = 1)[:]
+	my_countmap = countmap(vec_covs) #dict containing one hots and their occurances
+
+	shuffled_eigengenes = Array{Float64, 2}(undef, size(eigen_data)[1], size(eigen_data)[2]) 
+	for i in keys(my_countmap)
+		members = findall(x->x == i, vec_covs)
+		tmp_mat = eigen_data[:, members] #the data specified by covariate i
+		tmp_mat = mapslices(shuffle, tmp_mat, dims = 2) #shuffled data, each row (eigengene) independently
+		shuffled_eigengenes[:, members] = tmp_mat
+	end
+	shuffled_eigengenes = Float32.(vcat(shuffled_eigengenes, covs))
+	return(shuffled_eigengenes)
+
+end
+
+# Independently shuffles rows of dataFile within unique covariate conditions
+function permute_seedgenes(dataFile, options)
+  tmp_dataFile = dataFile[(size(options[:o_covariates])[2]+1):end,2:end] #remove covariate rows
+  covs = options[:o_covariates]'
+  vec_covs = mapslices(x -> [x], covs, dims = 1)[:]
+  my_countmap = countmap(vec_covs) #dict containing one hots and their occurances
+
+  shuffled_seeds = Array{Float64, 2}(undef, size(tmp_dataFile)[1], size(tmp_dataFile)[2]) #preallocate blank matrix
+  for i in keys(my_countmap)
+	members = findall(x->x == i, vec_covs)
+	tmp_mat = tmp_dataFile[:, members] #the data specified by covariate i
+	# tmp_mat = convert(Matrix, tmp_mat)
+	tmp_mat = Matrix(tmp_mat)
+	tmp_mat = parse.(Float32, tmp_mat)
+	tmp_mat = mapslices(shuffle, tmp_mat, dims = 2) #shuffled data, each row (eigengene) independently
+	shuffled_seeds[:, members] = tmp_mat
+  end
+  out_dataFile = dataFile
+  out = vcat(Matrix(out_dataFile[1:(size(options[:o_covariates])[2]),2:end]), shuffled_seeds)
+  out = hcat(out_dataFile[:, 1], out)
+  out = DataFrame( out, :auto)
+  rename!(out, names(dataFile))
+  return(out)
+end
+
+# Helper function to initialize linear model (cyclops with single node in bottleneck) for stat_err
+function InitializeLinearModel(eigen_data, options)
+	x_terms = permutedims(eigen_data[options[:o_svd_n_dims]+1:end, 1:end])
+	y_terms = eigen_data[1:options[:o_svd_n_dims], 1:end]
+	y_terms_t = permutedims(y_terms)
+	llsq_coeffs = -permutedims(llsq(x_terms, y_terms_t, bias = true))
+	B = llsq_coeffs[:, end]
+	B_OH = llsq_coeffs[:,1:end-1]
+	scaled_B_OH = (1 .+ options[:S_OH]) .* (B_OH .+ B) .- B
+	options[:B] = B 
+	options[:B_OH] = scaled_B_OH
+	output_models = Array{Any}([])
+	for ii in 1:options[:train_n_models]
+		use_S_OH = rand(size(options[:S_OH])...) .* options[:S_OH]
+		use_B = rand(size(B)...) .* B
+		use_B_OH = rand(size(B_OH)...) .* B_OH
+		append!(output_models, [CovariatesLinear(Array{Float32}(use_S_OH), Array{Float32}(use_B), Array{Float32}(use_B_OH), Dense(options[:o_svd_n_dims], 1), Dense(1, options[:o_svd_n_dims]), options[:o_svd_n_dims])])
+	end
+	return output_models
+end
+
+# Helper function to initialize linear model (cyclops with single node in bottleneck) where covariate layer is copied from best_circ_model for stat_err
+function InitializeLinearModelFrozenCovs(eigen_data, options, best_circ_model)
+	output_models = Array{Any}([])
+	for ii in 1:options[:train_n_models]
+		use_S_OH = best_circ_model.S_OH
+		use_B =  best_circ_model.B
+		use_B_OH = best_circ_model.B_OH
+		append!(output_models, [CovariatesLinear(Array{Float32}(use_S_OH), Array{Float32}(use_B), Array{Float32}(use_B_OH), Dense(options[:o_svd_n_dims], 1), Dense(1, options[:o_svd_n_dims]), options[:o_svd_n_dims])])
+	end
+	return output_models
+end
+
+# Returns the model with the smallest loss, and the smallest loss
+function getBestLoss(trained_models_and_errors::Array{Any, 1}, OUT_TYPE = Float64)
+	losses = map(x -> x[end], trained_models_and_errors)
+	losses[isnan.(losses)] .= Inf
+	best_loss, lowest_loss_index = findmin(losses)
+	models = map(x -> x[1], trained_models_and_errors)
+	best_model = models[lowest_loss_index]
+	return best_loss, best_model
+end
+
+# Covariates Linear model structure
+struct CovariatesLinear #define a different tu
+	S_OH	# Scaling factor for OH (encoding). Trainable
+	B		# Bias factor applied to all data. Trainable
+	B_OH	# Bias factor for OH (encoding). Trainable
+	L1  	# First linear layer (Dense). Reduced to at least 2 layers for the circ layer but can be reduced to only 3 to add one linear/non-linear layer. L1.W & L1.b are trainable
+	L2  	# Second linear layer (Dense). Takes output from circ and any additional linear layers and expands to number of eigengenes. L2.W & L2.b are trainable
+	o   	# output dimensions (out). Non-trainable parameter
+end
+
+# Overload call for CovariatesLinear structure
+function (m::CovariatesLinear)(x::Array{Float32,1})
+    Encoding_Onehot = x[1:m.o] .* (1 .+ (m.S_OH * x[m.o + 1:end])) .+ (m.B_OH * x[m.o + 1:end]) .+ m.B
+    Fully_Connected_Encoding = m.L1(Encoding_Onehot)
+	#Cicular_Layer = CircularNode(Fully_Connected_Encoding)
+	Fully_Connected_Decoding = m.L2(Fully_Connected_Encoding)
+	Decoding_Onehot = ((Fully_Connected_Decoding .- (m.B_OH * x[m.o + 1:end]) .- m.B) ./ (1 .+ (m.S_OH * x[m.o + 1:end])))
+	return Decoding_Onehot
+end
+
+# Method calls for CovariatesLinear
+function (m::CovariatesLinear)(x::Array{Float32,2})
+	return mapslices(y::Array{Float32,1} -> [m(y)], x, dims=1)[:]
+end
+
+function (m::CovariatesLinear)(x::Array{Array{Float32,1},1})
+	return map(y::Array{Float32,1} -> [m(y)], x)
+end
+
+function (m::CovariatesLinear)(x::Array{Array{Float32,1},2})
+	return map(y::Array{Float32,1} -> [m(y)], x[:])
 end
 ############
 # Plotting #
