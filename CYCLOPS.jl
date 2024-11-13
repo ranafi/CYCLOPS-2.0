@@ -4073,6 +4073,7 @@ function stat_err(dataFile, genesOfInterest, options, output_path; perms = 10, e
 	my_info("freeze_covs set to $freeze_covs")
 	eigen_data, genesOfInterestIndicesToKeep = Eigengenes!(dataFile, genesOfInterest, options)
 	
+	Random.seed!(1234);
 	#Compute the StatErr for the real data
 	non_shuffled_trial_statErr_tuple = score_circ_vs_linear_bottleneck(eigen_data, options, freeze_covs = freeze_covs,return_best_circ_model = true )
     non_shuffled_trial_statErr = non_shuffled_trial_statErr_tuple[1]
@@ -4133,7 +4134,6 @@ end
 function score_circ_vs_linear_bottleneck(eigen_data, options; freeze_covs = false, covs = true, return_best_circ_model = false)
 	#Initialize models, trains models, gets best loss from initialized models, returns (linear - circular)/circular error
 	#traditional circular node initialization and training
-	Random.seed!(1234);
 	init_models_circular = InitializeModel(eigen_data, options) #init tradiational cyclops model
     if covs
 	    trained_models_and_errors_circular = MultiTrainCovariates(init_models_circular, eigen_data, options, verbose = false)
