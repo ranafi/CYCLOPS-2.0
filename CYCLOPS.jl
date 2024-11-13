@@ -4013,6 +4013,12 @@ function Jammalamadka_Circular_CorrelationMeasures(rphases::T,sphases::T) where 
 	return [J, JU, JR]
 end
 
+# Helper function for calculating smoothness
+function circ_diff(data::Array{Float32,2})
+	circd=hcat(diff(data, dims = 2),data[:,1]-data[:,end])
+	circd
+end
+
 # This is one performance metric that tests for a smooth trajectory.
 # A return value < 1 is satisfactory.
 # A returns value > 1 is unsatisfactory.
