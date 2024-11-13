@@ -1,12 +1,85 @@
-using DataFrames, Statistics, StatsBase, LinearAlgebra, MultivariateStats, PyPlot, Distributed, Random, CSV, Revise, Distributions, Dates, MultipleTesting
+# CYCLOPS 2.0 Template
+# This CYCLOPS 2.0 template will guide you through set up.
+#   Workflow
+# 1.    load required packages
+# 2.    define path to your expression data
+# 3.    load expression data
+# 4.    define path to your seed gene list
+# 6.    define path to your output directory
+# 8.    initialize training parameters
+# 9.    spawn multiple processors for parallel computing
+# 10.   train CYCLOPS
+# 11.   store outputs
+# 12.   calculate smoothness metric
+# 13.   reapply CYCLOPS to sample subsets
+# 14.   store reapplied outputs
+# 15.   calculate reapplied smoothness metric
+# 16.   calculate stat error
 
-base_path = joinpath(homedir(), "", "") # define the base path in which the data file, the seed gene list, and the sample collection time file are located
-data_path = joinpath(base_path, "") # path for data folder in base folder
-path_to_cyclops = joinpath(base_path, "") # path to CYCLOPS.jl
-output_path = joinpath(base_path, "") # real training run output folder in base folder
 
-expression_data = CSV.read(joinpath(data_path, ""), DataFrame) # load data file in data folder
+########################################################################
+# 1. Load Required Packages
+# These packages are required at the top level. Other required packages are loaded within the CYCLOPS module.
+# CSV:          Provides fast, flexible reader & writer for delimited text files in various formats.
+# DataFrames:   To store data in dataframe format (used in conjunction with CSV).
+# Random:       Support for generating random numbers.
+# Revise:       Tracks source code changes and incorporates the changes to a running Julia session.
+# Distributed:  Tools for distributed parallel processing.
+# addprocs:     Launches workers using the in-built LocalManager which only launches workers on the local host.
+# rmprocs:      Remove the specified workers.
+using CSV, DataFrames, Random, Revise
+using Distributed: addprocs, rmprocs
+########################################################################
 
+
+########################################################################
+# 2. Define Path to Expression Data
+data_path = joinpath(homedir(), "your/path/to/expression/data/file.csv")    # path to expression data   (.csv)
+########################################################################
+
+
+########################################################################
+# 3. Load Expression Data
+expression_data = CSV.read(data_path, DataFrame)                            # load expression data to a dataframe
+########################################################################
+
+
+########################################################################
+# 4. Define Path to Seed Gene List
+# You may or may not have stored your seed gene list to a csv file.
+# If your seed gene list is stored to a csv file, define your path to said file here.
+# Make note of the column header in the file, you'll need it in step 5.
+# If you did not store your seed gene list to a csv file you can skip this step and go to setp 5.
+seed_path = joinpath(homedir(), "your/path/to/seed/gene/file.csv")          # path to seed gene list    (.csv)
+########################################################################
+
+
+########################################################################
+# 5. Load Seed Gene List
+# If your seed gene list is stored to a csv file, this will read in the file as a dataframe.
+# This code assumes that the column header of the seed gene file is 'Gene_Symbols'
+# If the column header of your seed gene list file is not 'Gene_Symbols', replace it with your column header.
+# Here are some examples of changing the selected column header
+# e.g. seed_genes = CSV.read(seed_path, DataFrame).symbols
+# e.g. seed_genes = CSV.read(seed_path, DataFrame).x
+# e.g. seed_genes = CSV.read(seed_path, DataFrame).x1
+# e.g. seed_genes = CSV.read(seed_path, DataFrame).ID
+# e.g. seed_genes = CSV.read(seed_path, DataFrame).GENEID
+seed_genes = CSV.read(seed_path, DataFrame).Gene_Symbols
+########################################################################
+
+
+########################################################################
+# 4. Define Path to Output Directory
+output_path = joinpath(homedir(), "your/path/to/desired/output/directory")  # path to output directory  (./)
+########################################################################
+
+
+########################################################################
+########################################################################
+
+
+########################################################################
 seed_genes = [] # vector of strings containing gene symbols matching the format of gene symbols in the first column of the expression_data dataframe.
 
 sample_ids_with_collection_times = [] # sample ids for which collection times exist
