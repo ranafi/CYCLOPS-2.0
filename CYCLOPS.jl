@@ -1565,7 +1565,9 @@ function GetBluntXthPercentile(dataFile::T, ops; OUT_TYPE = DataFrame) where T <
 			normCovOnehot = ops[:o_dco][ops[:norm_disc_cov]]
 			subset_logical = [Bool.(normCovOnehot[ll, :]) for ll in 1:size(normCovOnehot, 1)]
 			output_data_i = [BluntXthPercentile(dataFile, ops, ii, OUT_TYPE = OUT_TYPE) for ii in subset_logical]
-			output_data = foldl((x, y) -> innerjoin(x, y, on = names(x)[1]), output_data_i)
+			output_data = hcat(output_data_i..., makeunique=true)
+			selected_columns = names(output_data)[.!occursin.(r"Gene_Symbols(?=_[0-9]{1,3})", names(output_data))]
+			output_data = select(output_data, selected_columns)
 		else
 			subset_logical = repeat([true], size(dataFile)[2]-1)
 			output_data = BluntXthPercentile(dataFile, ops, subset_logical, OUT_TYPE = OUT_TYPE)
