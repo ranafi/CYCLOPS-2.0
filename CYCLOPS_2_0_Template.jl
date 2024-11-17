@@ -1,22 +1,207 @@
-# CYCLOPS 2.0 Template
-# This CYCLOPS 2.0 template will guide you through set up.
-#   Workflow
-# 1.    load required packages
-# 2.    define path to your expression data
-# 3.    load expression data
-# 4.    define path to your seed gene list
-# 6.    define path to your output directory
-# 8.    initialize training parameters
-# 9.    spawn multiple processors for parallel computing
-# 10.   train CYCLOPS
-# 11.   store outputs
-# 12.   calculate smoothness metric
-# 13.   reapply CYCLOPS to sample subsets
-# 14.   store reapplied outputs
-# 15.   calculate reapplied smoothness metric
-# 16.   calculate stat error
+#= 
+CYCLOPS 2.0 Template
+Guide to setting up Julia 1.6.6 and CYCLOPS 2.0
 
 
+########################################################################
+TABLE OF CONTENTS
+i.      introduction
+ii.     julia setup
+iii.    coding basics
+    Workflow
+    1.    load required packages
+    2.    define path to your expression data
+    3.    load expression data
+    4.    define path to your seed gene list
+    6.    define path to your output directory
+    8.    initialize training parameters
+    9.    spawn multiple processors for parallel computing
+    10.   train CYCLOPS
+    11.   store outputs
+    12.   calculate smoothness metric
+    13.   reapply CYCLOPS to sample subsets
+    14.   store reapplied outputs
+    15.   calculate reapplied smoothness metric
+    16.   calculate stat error
+########################################################################
+
+
+
+########################################################################
+i.      Introduction
+---------------------------------------------------------------------------------------------------------------
+
+If you have a good understanding of coding basics---running code in the command line, adding comments, making 
+lists, making dictionaries, getting help, defining variables, calling functions---have downloaded julia 1.6.6,
+and have installed the neccessary versions of all required packages then continue to section 1: 'load required 
+packages.'
+
+
+ii.     julia setup
+---------------------------------------------------------------------------------------------------------------
+
+After you have downloaded julia 1.6.6 (https://julialang.org/downloads/oldreleases/), double click the julia 
+app icon to open the julia command line. You should see the following (figure 1):
+
+figure 1
+________________________________________________________________________
+               _                                                        |
+   _       _ _(_)_     |  Documentation: https://docs.julialang.org     |
+  (_)     | (_) (_)    |                                                |
+   _ _   _| |_  __ _   |  Type "?" for help, "]?" for Pkg help.         |
+  | | | | | | |/ _` |  |                                                |
+  | | |_| | | | (_| |  |  Version 1.6.6 (2022-03-28)                    |
+ _/ |\__'_|_|_|\__'_|  |  Official https://julialang.org/ release       |
+|__/                   |                                                |
+                                                                        |
+julia>                                                                  |
+________________________________________________________________________|
+
+Everything you type will now be interpreted in the programming language julia, version 1.6.6. The next step is
+to install the neccessary versions of required packages. julia has what is called a 'package manager' which you
+can access by typing ']'. You will notice in figure 2 that you don't see the ']' character, instead 'julia>' 
+changes to '(@v1.6) pkg>':
+
+figure 2
+________________________________________________________________________
+               _                                                        |
+   _       _ _(_)_     |  Documentation: https://docs.julialang.org     |
+  (_)     | (_) (_)    |                                                |
+   _ _   _| |_  __ _   |  Type "?" for help, "]?" for Pkg help.         |
+  | | | | | | |/ _` |  |                                                |
+  | | |_| | | | (_| |  |  Version 1.6.6 (2022-03-28)                    |
+ _/ |\__'_|_|_|\__'_|  |  Official https://julialang.org/ release       |
+|__/                   |                                                |
+                                                                        |
+(@v1.6) pkg>                                                            |
+________________________________________________________________________|
+
+Now copy-paste the following (line 81) and hit enter:
+
+add CSV@0.10.4 DataFrames@1.3.4 Distributions@0.25.68 Flux@0.13.5 MultipleTesting@0.5.1 MultivariateStats@0.10.0 Plots@1.38.11 PyPlot@2.11.0 Revise@3.4.0 StatsBase@0.33.21 XLSX@0.8.4
+
+This should install the necessary packages to run CYCLOPS 2.0.
+
+
+iii.    coding basics
+---------------------------------------------------------------------------------------------------------------
+
+a. running code
+In this template 'running code' means to copy-paste lines of code into the julia command line.
+
+b. commenting
+To 'comment' is to add a '#' (pound sign or hashtag) before something you do not want to be considered as code.
+Everything after '#' is ignored.
+
+c. lists
+To make a list in julia, put items inside '[]' and separate them with a comma.
+e.g. a list of numbers:     [1, 24, 1e10, 3.65]
+e.g. a list of words:       ["hello", "there", "how", "are", "you"]
+
+d. dictionaries
+You can also store things in a dictionary, where values are associated with keys.
+e.g. a dictionary for item inventory: Dict(:my_item_1 => 4, :my_item_2 => 7, :my_item_3 => 0)
+
+e. getting help
+To find out what input arguments a function has, or if a variable name is available, use '?' and the function 
+or variable name. You will notice in figure 3 that you don't see the '?' character, instead 'julia>' changes to
+'help?>'
+e.g. you want to check if 'test' is available as a variable name: ?test
+
+figure 3
+________________________________________________________________________
+help?> test                                                             |
+search: _test @text_str intersect intersect! mutable struct             |
+                                                                        |
+Couldn't find test                                                      |
+Perhaps you meant _test, Text, Set, get, let, last, reset or less       |
+  No documentation found.                                               |
+                                                                        |
+  Binding test does not exist.                                          |
+                                                                        |
+julia>                                                                  |
+________________________________________________________________________|
+
+If you see this message about your desired variable name, you are free to use it.
+
+e.g. you want to know how to use the sin function
+
+figure 4
+________________________________________________________________________
+                                                                        |
+help?> sin                                                              |
+search: sin sinh sind sinc sinpi sincos sincosd sincospi asin using     |
+                                                                        |
+  sin(x)                                                                |
+                                                                        |
+  Compute sine of x, where x is in radians.                             |
+                                                                        |
+julia>                                                                  |
+________________________________________________________________________|
+
+f. defining variables
+Defining a variable means that you associate something with a name of your choosing with a '='. There are two 
+important rules to choosing variable names: don't use a name that is also a function name and don't start your
+names with numbers. Say we want to store a list of gene symbols in a list named gene_symbols.
+
+figure 5
+________________________________________________________________________
+                                                                        |
+julia> gene_symbols = ["ARNTL", "CLOCK", "PER1", "CRY1"]                |
+4-element Vector{String}:                                               |
+ "ARNTL"                                                                |
+ "CLOCK"                                                                |
+ "PER1"                                                                 |
+ "CRY1"                                                                 |
+                                                                        |
+julia>                                                                  |
+________________________________________________________________________|
+
+g. calling functions
+Functions have names and they have input arguments. Write the function name followed by '(' and the function's
+input arguments, then followed by ')'. You can store the outputs of functions to variable names. Some functions
+have more than one output.
+e.g. you want to find the minimum of a list of 3 numbers
+
+figure 6
+________________________________________________________________________
+                                                                        |
+julia> my_numbers = [70, 10, 30]                                        |
+3-element Vector{Int64}:                                                |
+ 70                                                                     |
+ 10                                                                     |
+ 30                                                                     |
+                                                                        |
+julia> min_number = minimum(my_numbers)                                 |
+10                                                                      |
+                                                                        |
+julia> min_number, min_index = findmin(my_numbers)                      |
+(10, 2)                                                                 |
+                                                                        |
+julia> min_number                                                       |
+10                                                                      |
+                                                                        |
+julia> min_index                                                        |
+2                                                                       |
+                                                                        |
+julia> my_numbers[min_index]                                            |
+10                                                                      |
+________________________________________________________________________|
+
+The 'minimum' function returns the smallest value in the list. The 'findmin' function returns the minimum value
+and the index of the minimum value.
+
+Continue below for the CYCLOPS 2.0 workflow. Read the instructions and run the lines of code not preceeded by
+'#' in the julia command line. Please contact janham@pennmedicine.upenn.edu with questions about this template.
+Kindly make the email's subject 'GitHub CYCLOPS 2.0'. Please copy and paste the full error in the body of the 
+email and provide the versions of all required packages. Further, provide the script and all necessary files to
+recreate the error you are encountering. Good luck and happy ordering.
+########################################################################
+
+
+
+=#######################################################################
+# WORKFLOW #############################################################
 ########################################################################
 # 1. Load Required Packages
 # These packages are required at the top level. Other required packages are loaded within the CYCLOPS module.
@@ -56,7 +241,8 @@ seed_path = joinpath(homedir(), "your/path/to/seed/gene/file.csv")          # pa
 
 ########################################################################
 # 5. Load Seed Gene List
-# If your seed gene list is stored to a csv file, this will read in the file as a dataframe.
+# READ CAREFULLY! TWO SCENARIOS!
+# SCENARIO 1: If your seed gene list is stored to a csv file, this will read in the file as a dataframe.
 # This code assumes that the column header of the seed gene file is 'Gene_Symbols'
 # If the column header of your seed gene list file is not 'Gene_Symbols', replace it with your column header.
 # Here are some examples of changing the selected column header
@@ -66,6 +252,7 @@ seed_path = joinpath(homedir(), "your/path/to/seed/gene/file.csv")          # pa
 # e.g. seed_genes = CSV.read(seed_path, DataFrame).ID
 # e.g. seed_genes = CSV.read(seed_path, DataFrame).GENEID
 seed_genes = CSV.read(seed_path, DataFrame).Gene_Symbols
+# SCENARIO 2:
 ########################################################################
 
 
